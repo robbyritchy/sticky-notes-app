@@ -1,44 +1,57 @@
-body{
-
-    margin: 0;
-    background:#009578;
-    
-
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #fdfdfd;
+  height: 100vh;
+  overflow: hidden;
 }
 
-#app{
-    display: grid;
-    grid-template-columns: repeat(auto-fill, 200px);
-    padding: 24px;
-    gap: 24px;
-
+#app {
+  position: relative; /* notes positioned inside */
+  width: 100%;
+  height: 100%;
 }
 
-.note{
-    height: 200px;
-    box-sizing: border-box;
-    padding: 16px;
-    border: none;
-    border-radius: 10px;
-    box-shadow: 0 0 7px rgba(0,0,0,0.15);
-    /*resize: none; /*remove to edit size*/
-    font-family: sans-serif;
-    font-size: 16px;
-     
+.note {
+  position: absolute;
+  top: 50px;
+  left: 50px;
+  width: 200px;
+  height: 200px;
+  padding: 10px;
+  box-sizing: border-box;
+
+  background: #fffb88;
+  border: 1px solid #e0d400;
+  border-radius: 8px;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
+
+  resize: both;         /* allow free resizing */
+  overflow: auto;
+  cursor: move;         /* hint that it’s draggable */
 }
 
-.add-note{
-    height: 200px;
-    border: none;
-    outline: none;
-    background: rgba(0,0,0,0.1);
-    border-radius: 10px;
-    font-size: 120px;
-    color: rgba(0,0,0,0.5); 
-    cursor: pointer; 
-    transition: background 0.2s;
+.add-note {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: none;
+  background: #4caf50;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
-.add-note:hover{
-    color: rgba(0,0,0,0.2);
+.add-note:hover {
+  background: #43a047;
+}
+.note-header {
+  background: #f0e45c;
+  padding: 4px 8px;
+  cursor: grab;
+  font-weight: bold;
+  border-bottom: 1px solid #d6c700;
+  user-select: none;
 }
