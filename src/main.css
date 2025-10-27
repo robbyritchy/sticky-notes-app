@@ -12,25 +12,49 @@ body {
   height: 100%;
 }
 
-.note {
+/* Wrapper for each sticky note */
+.note-wrapper {
   position: absolute;
-  top: 50px;
-  left: 50px;
-  width: 200px;
-  height: 200px;
-  padding: 10px;
-  box-sizing: border-box;
-
-  background: #fffb88;
-  border: 1px solid #e0d400;
+  background: #fff59d;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.2);
   border-radius: 8px;
-  box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
-
-  resize: both;         /* allow free resizing */
-  overflow: auto;
-  cursor: move;         /* hint that it’s draggable */
+  overflow: hidden;
+  cursor: move;
+  display: flex;
+  flex-direction: column; /* stack header + content */
+  resize: both;
 }
 
+/* Category header at top of note */
+.note-header {
+  background: #f0e45c;
+  border-bottom: 1px solid #d6c700;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 6px 8px;
+  outline: none;
+  cursor: text;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Textarea for note content */
+.note {
+  flex-grow: 1;        /* fill remaining space */
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  resize: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  box-sizing: border-box;
+  overflow: auto;
+  cursor: text;
+}
+
+/* Add new note button */
 .add-note {
   position: absolute;
   top: 10px;
@@ -46,12 +70,4 @@ body {
 
 .add-note:hover {
   background: #43a047;
-}
-.note-header {
-  background: #f0e45c;
-  padding: 4px 8px;
-  cursor: grab;
-  font-weight: bold;
-  border-bottom: 1px solid #d6c700;
-  user-select: none;
 }
