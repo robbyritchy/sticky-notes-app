@@ -1,3 +1,4 @@
+/* main.css - combine with your existing CSS */
 body {
   margin: 0;
   font-family: sans-serif;
@@ -12,6 +13,59 @@ body {
   height: 100%;
 }
 
+/* Toolbar at top-left */
+.toolbar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 999;
+}
+
+.toolbar button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar button:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.toolbar img {
+  width: 22px;
+  height: 22px;
+}
+
+/* Search bar */
+.search-bar {
+  position: absolute;
+  top: 8px;
+  left: 160px;
+  z-index: 999;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background: white;
+  border-radius: 6px;
+  padding: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.search-bar input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  width: 260px;
+}
+
 /* Wrapper for each sticky note */
 .note-wrapper {
   position: absolute;
@@ -23,6 +77,16 @@ body {
   display: flex;
   flex-direction: column; /* stack header + content */
   resize: both;
+  transition: box-shadow .12s;
+}
+
+/* shape variations */
+.note-wrapper.shape-circle {
+  border-radius: 50%;
+  overflow: hidden;
+}
+.note-wrapper.shape-pillow {
+  border-radius: 16px;
 }
 
 /* Category header at top of note */
@@ -37,9 +101,20 @@ body {
   flex-shrink: 0;
   width: 100%;
   box-sizing: border-box;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  justify-content:space-between;
 }
 
-/* Textarea for note content */
+/* actions in header (style button + reminder icon) */
+.note-actions {
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+/* Note content */
 .note {
   flex-grow: 1;        /* fill remaining space */
   width: 100%;
@@ -54,20 +129,56 @@ body {
   cursor: text;
 }
 
-/* Add new note button */
-.add-note {
+/* style picker popup */
+.style-picker {
   position: absolute;
-  top: 10px;
-  left: 10px;
-  padding: 8px 12px;
-  font-size: 14px;
-  border: none;
-  background: #4caf50;
-  color: white;
+  z-index: 10000;
+  background: white;
+  border: 1px solid #e6e6e6;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  padding: 8px;
   border-radius: 6px;
-  cursor: pointer;
+  display: grid;
+  gap:8px;
+  width: 180px;
 }
 
-.add-note:hover {
-  background: #43a047;
+.color-swatch {
+  width: 28px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.08);
+  cursor: pointer;
+  display:inline-block;
+  margin-right:6px;
+}
+
+/* footer controls (delete, reminder) */
+.note-footer {
+  padding: 6px;
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+
+/* delete button */
+.note-delete {
+  border: none;
+  background: #ef5350;
+  color: white;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor:pointer;
+}
+
+.small {
+  font-size: 12px;
+  padding: 6px;
+}
+
+/* compact icons row in note header */
+.icon {
+  width:18px;
+  height:18px;
+  display:inline-block;
 }
