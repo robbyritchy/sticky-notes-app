@@ -1,5 +1,5 @@
 // __tests__/searchService.test.js
-import { searchService } from "../services/searchService.js";
+import { searchService } from "../src/services/searchService.js";
 
 describe("searchService", () => {
   const notes = [

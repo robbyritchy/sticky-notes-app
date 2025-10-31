@@ -1,5 +1,5 @@
 // __tests__/reminderScheduler.test.js
-import { reminderScheduler } from "../services/notificationService.js";
+import { reminderScheduler } from "../src/services/notificationService.js";
 jest.useFakeTimers();
 
 test("schedules a reminder and fires at correct time", () => {
