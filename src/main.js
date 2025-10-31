@@ -540,7 +540,15 @@ function init(){
   searchInput.addEventListener("input",(e)=>renderAllNotes(e.target.value));
 }
 
+window._stickies = window._stickies || {};
 
+window._stickies.getNotes = () => JSON.parse(localStorage.getItem("stickynotes-notes") || "[]");
+window._stickies.saveNotes = (notes) => localStorage.setItem("stickynotes-notes", JSON.stringify(notes));
+window._stickies.renderAllNotes = (filterQuery) => renderAllNotes(filterQuery);
+window._stickies.addNote = () => addNote();
 
-// expose helpers
-window._stickies={getNotes, saveNotes, renderAllNotes, addNote};
+// exports for Jest tests or modules
+export const getNotes = window._stickies.getNotes;
+export const saveNotes = window._stickies.saveNotes;
+export const renderAllNotes = window._stickies.renderAllNotes;
+export const addNote = window._stickies.addNote;

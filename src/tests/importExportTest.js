@@ -8,12 +8,13 @@ describe("importExportService", () => {
     const aMock = { click: jest.fn() };
     const createAnchorSpy = jest.spyOn(document, 'createElement').mockReturnValue(aMock);
     importExportService.exportNotes(sampleNotes);
-    expect(createAnchorSpy).toHaveBeenCalled();
+    expect(createAnchorSpy).toHaveBeenCalledWith("a");
+    expect(aMock.click).toHaveBeenCalled();
     createAnchorSpy.mockRestore();
   });
 
   test("import reads valid JSON", async () => {
-    const file = new File([JSON.stringify({ notes: sampleNotes })], "n.json", { type: "application/json" });
+    const file = new File([JSON.stringify(sampleNotes)], "n.json", { type: "application/json" });
     const notes = await importExportService.importNotes(file);
     expect(notes).toEqual(sampleNotes);
   });
