@@ -1,4 +1,4 @@
-// main.js - integrated app
+// main.js - integrated app with sidebar, minimize, dynamic layout
 import { importExportService } from "./services/importExportService.js";
 import { FilePicker } from "./components/FilePicker.js";
 import { createStylePicker } from "./components/NoteStylePicker.js";
@@ -8,31 +8,103 @@ import { notificationService, reminderScheduler } from "./services/notificationS
 const notesContainer = document.getElementById("app");
 let addNoteButton = notesContainer.querySelector(".add-note");
 
-// toolbar icons - using the images you provided earlier (paths to /mnt/data files)
-// update these if you place images in a different folder
-const IMPORT_ICON = "/mnt/data/5d4eafce-c613-4529-9473-e0dc8fc7af16.png";
-const EXPORT_ICON = "/mnt/data/195a9fd0-4f58-4f8d-965d-160e68c05834.png";
-const STYLE_ICON = "/mnt/data/7981ef25-05db-4344-b9e1-8a580dbd1862.png";
+// create sidebar
+const sidebar = document.createElement("div");
+sidebar.id = "notes-sidebar";
+document.body.appendChild(sidebar);
 
 // create toolbar
 const toolbar = document.createElement("div");
 toolbar.className = "toolbar";
+const importBtn = document.createElement("button"); importBtn.textContent = "Import";
 
-const importBtn = document.createElement("button");
-importBtn.title = "Import notes";
-importBtn.innerHTML = `<img src="${IMPORT_ICON}" alt="Import" />`;
+// Export dropdown
+const exportWrapper = document.createElement("div");
+exportWrapper.className = "export-wrapper";
+exportWrapper.style.position = "relative";
+exportWrapper.style.display = "inline-block";
 
 const exportBtn = document.createElement("button");
-exportBtn.title = "Export notes";
-exportBtn.innerHTML = `<img src="${EXPORT_ICON}" alt="Export" />`;
+exportBtn.textContent = "Export ▼";
+exportWrapper.appendChild(exportBtn);
 
-const styleLegendBtn = document.createElement("button");
-styleLegendBtn.title = "Style picker help";
-styleLegendBtn.innerHTML = `<img src="${STYLE_ICON}" alt="Style" />`;
+// dropdown list container
+const dropdown = document.createElement("div");
+dropdown.className = "export-dropdown";
+dropdown.style.position = "absolute";
+dropdown.style.top = "100%";
+dropdown.style.left = "0";
+dropdown.style.background = "#fff";
+dropdown.style.border = "1px solid #ccc";
+dropdown.style.boxShadow = "0 2px 6px rgba(0,0,0,0.15)";
+dropdown.style.padding = "4px 0";
+dropdown.style.display = "none";
+dropdown.style.zIndex = "1000";
+exportWrapper.appendChild(dropdown);
 
-toolbar.appendChild(importBtn);
-toolbar.appendChild(exportBtn);
-toolbar.appendChild(styleLegendBtn);
+exportBtn.addEventListener("click", () => {
+  // Toggle dropdown visibility
+  dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
+  rebuildDropdown();
+});
+
+// Rebuild dropdown items dynamically
+function rebuildDropdown() {
+  dropdown.innerHTML = "";
+
+  // Option: Export all
+  const allOpt = document.createElement("div");
+  allOpt.textContent = "Export All Notes";
+  allOpt.className = "dropdown-item";
+  allOpt.style.cursor = "pointer";
+  allOpt.style.padding = "4px 8px";
+  allOpt.addEventListener("click", () => {
+    dropdown.style.display = "none";
+    importExportService.exportNotes(getNotes());
+  });
+  dropdown.appendChild(allOpt);
+
+  // Divider
+  const divider = document.createElement("div");
+  divider.style.borderTop = "1px solid #ddd";
+  divider.style.margin = "4px 0";
+  dropdown.appendChild(divider);
+
+  // Individual notes
+  const notes = getNotes();
+  if (notes.length === 0) {
+    const empty = document.createElement("div");
+    empty.textContent = "(no notes)";
+    empty.style.color = "#777";
+    empty.style.padding = "4px 8px";
+    dropdown.appendChild(empty);
+  } else {
+    notes.forEach(n => {
+      const item = document.createElement("div");
+      item.textContent = n.title || n.content.substring(0, 20) || "Untitled";
+      item.className = "dropdown-item";
+      item.style.cursor = "pointer";
+      item.style.padding = "4px 8px";
+      item.addEventListener("click", () => {
+        dropdown.style.display = "none";
+        importExportService.exportNotes([n]);
+      });
+      dropdown.appendChild(item);
+    });
+  }
+}
+
+// Hide dropdown if clicking outside
+document.addEventListener("click", (e) => {
+  if (!exportWrapper.contains(e.target)) dropdown.style.display = "none";
+});
+
+// append wrapper instead of button
+toolbar.appendChild(exportWrapper);
+
+
+const styleLegendBtn = document.createElement("button"); styleLegendBtn.textContent = "Style";
+toolbar.appendChild(importBtn);  toolbar.appendChild(styleLegendBtn);
 notesContainer.appendChild(toolbar);
 
 // search bar
@@ -43,356 +115,432 @@ searchInput.placeholder = "Search notes by text or category…";
 searchBar.appendChild(searchInput);
 notesContainer.appendChild(searchBar);
 
-// file picker + import/export wiring
+// File picker + import/export wiring
 const filePicker = new FilePicker(async (file) => {
   try {
     const imported = await importExportService.importNotes(file);
-    // Map to our note shape and merge
     const current = getNotes();
-    // avoid collided ids: if imported id already exists, prefix with import-
     imported.forEach(n => {
-      if (current.some(c => c.id == n.id)) {
-        n.id = `import-${Date.now()}-${Math.floor(Math.random()*10000)}`;
-      }
-      // ensure required fields exist
+      if (current.some(c => c.id == n.id)) n.id = `import-${Date.now()}-${Math.floor(Math.random()*10000)}`;
       n.content = n.content || "";
       n.category = n.category || "Uncategorized";
-      n.top = n.top || "60px";
-      n.left = n.left || "60px";
-      n.width = n.width || "200px";
-      n.height = n.height || "220px";
-      n.color = n.color || "#fff59d";
-      n.shape = n.shape || "rectangle";
+      n.top = n.top || "60px"; n.left = n.left || "60px";
+      n.width = n.width || "200px"; n.height = n.height || "220px";
+      n.color = n.color || "#fff59d"; n.shape = n.shape || "rectangle";
     });
     const merged = [...current, ...imported];
     saveNotes(merged);
     renderAllNotes();
+    updateSidebar();
     reminderScheduler.rescheduleAll(merged);
     alert(`Imported ${imported.length} notes.`);
-  } catch (err) {
-    alert("Import failed: " + (err.message || err));
-  }
+  } catch (err) { alert("Import failed: " + (err.message || err)); }
 });
 
 importBtn.addEventListener("click", () => filePicker.open());
-exportBtn.addEventListener("click", () => {
+
+// Helpers
+function getNotes() { return JSON.parse(localStorage.getItem("stickynotes-notes") || "[]"); }
+function saveNotes(notes) { localStorage.setItem("stickynotes-notes", JSON.stringify(notes)); }
+
+// --- CATEGORY STORAGE HELPERS ---
+function getCategories() {
+  // returns array of category names (persisted + derived)
+  const persisted = JSON.parse(localStorage.getItem("stickynotes-categories") || "[]");
   const notes = getNotes();
-  importExportService.exportNotes(notes);
-});
-
-// small helper: get notes from localStorage (stickynotes-notes key)
-function getNotes() {
-  return JSON.parse(localStorage.getItem("stickynotes-notes") || "[]");
+  const fromNotes = [...new Set(notes.map(n => n.category).filter(Boolean))];
+  // union persisted + fromNotes
+  const all = [...new Set([...persisted, ...fromNotes])];
+  // ensure "Uncategorized" exists
+  if (!all.includes("Uncategorized")) all.unshift("Uncategorized");
+  return all;
 }
-function saveNotes(notes) {
-  localStorage.setItem("stickynotes-notes", JSON.stringify(notes));
+function saveCategories(list) {
+  localStorage.setItem("stickynotes-categories", JSON.stringify(list));
 }
 
-// Initialize app
-init();
+// --- REPLACEMENT updateSidebar() ---
+function updateSidebar() {
+  sidebar.innerHTML = "";
 
-function init() {
-  // If no add button in DOM (maybe replaced), ensure addNoteButton ref
-  addNoteButton = notesContainer.querySelector(".add-note") || createAddButton();
-  // restore notes
-  renderAllNotes();
-  // request notification permission so scheduler can display later
-  if ("Notification" in window && Notification.permission !== "granted") {
-    // ask but do not force - better UX is to ask when user enables reminders; we ask once here
-    notificationService.requestPermission().then(p => {
-      // no-op
+  // === Add Category Button ===
+  const addCatBtn = document.createElement("button");
+  addCatBtn.textContent = "+ Add Category";
+  addCatBtn.className = "add-category-btn";
+  addCatBtn.addEventListener("click", () => {
+    const newCat = prompt("Enter new category name:");
+    if (!newCat) return;
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+
+    const cats = getCategories();
+    if (cats.includes(trimmed)) {
+      alert("That category already exists!");
+      return;
+    }
+    cats.push(trimmed);
+    saveCategories(cats);
+    updateSidebar();
+  });
+  sidebar.appendChild(addCatBtn);
+
+  // pull categories (persisted + note-derived)
+  const categories = getCategories();
+  const notes = getNotes();
+
+  categories.forEach(cat => {
+    const catDiv = document.createElement("div");
+    catDiv.className = "sidebar-category";
+    catDiv.dataset.category = cat;
+
+    const header = document.createElement("div");
+    header.className = "category-header";
+    header.textContent = cat;
+
+    // optionally add rename/delete icons next to header (small UX nicety)
+    const headerControls = document.createElement("span");
+    headerControls.style.marginLeft = "8px";
+    // rename
+    const renameBtn = document.createElement("button");
+    renameBtn.textContent = "✎";
+    renameBtn.title = "Rename category";
+    renameBtn.className = "small";
+    renameBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const newName = prompt("Rename category:", cat);
+      if (!newName) return;
+      const trimmed = newName.trim();
+      if (!trimmed) return;
+      const allCats = getCategories();
+      if (allCats.includes(trimmed)) return alert("That category already exists.");
+      // update persisted categories and update notes that had this category
+      const updatedCats = allCats.map(c => c === cat ? trimmed : c);
+      saveCategories(updatedCats);
+      const ns = getNotes();
+      ns.forEach(n => { if (n.category === cat) n.category = trimmed; });
+      saveNotes(ns);
+      updateSidebar();
+      renderAllNotes();
     });
-  }
-  // schedule existing reminders
-  reminderScheduler.rescheduleAll(getNotes());
-  // wire search
-  searchInput.addEventListener("input", (e) => {
-    renderAllNotes(e.target.value);
+    // delete (only if category not "Uncategorized")
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "🗑";
+    deleteBtn.title = "Delete category (notes will be moved to Uncategorized)";
+    deleteBtn.className = "small";
+    deleteBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      if (cat === "Uncategorized") return alert("Cannot delete Uncategorized.");
+      if (!confirm(`Delete category "${cat}"? Notes in this category will be moved to Uncategorized.`)) return;
+      // remove from persisted list and update notes
+      const remaining = getCategories().filter(c => c !== cat);
+      saveCategories(remaining);
+      const ns = getNotes();
+      ns.forEach(n => { if (n.category === cat) n.category = "Uncategorized"; });
+      saveNotes(ns);
+      updateSidebar();
+      renderAllNotes();
+    });
+
+    headerControls.appendChild(renameBtn);
+    headerControls.appendChild(deleteBtn);
+    header.appendChild(headerControls);
+
+    catDiv.appendChild(header);
+
+    // container for items
+    const itemsDiv = document.createElement("div");
+    itemsDiv.className = "category-items";
+
+    // Drag target behavior (drop sidebar items here)
+    catDiv.addEventListener("dragover", e => {
+      e.preventDefault();
+      catDiv.classList.add("drag-over");
+    });
+    catDiv.addEventListener("dragleave", () => catDiv.classList.remove("drag-over"));
+    catDiv.addEventListener("drop", e => {
+      e.preventDefault();
+      catDiv.classList.remove("drag-over");
+      const noteId = e.dataTransfer.getData("text/plain");
+      if (!noteId) return;
+      const ns = getNotes();
+      const target = ns.find(n => n.id == noteId);
+      if (!target) return;
+      target.category = cat;
+      saveNotes(ns);
+      // ensure this category exists in persisted list
+      const persisted = getCategories();
+      if (!persisted.includes(cat)) {
+        persisted.push(cat);
+        saveCategories(persisted);
+      }
+      updateSidebar();
+      renderAllNotes();
+    });
+
+    // add items that belong to this category (sidebar entries draggable)
+    notes.filter(n => (n.category || "Uncategorized") === cat).forEach(note => {
+      const item = document.createElement("div");
+      item.className = "sidebar-item";
+      item.textContent = note.title || note.content.substring(0, 20) || "Untitled";
+      item.dataset.noteId = note.id;
+
+      // Make sidebar item draggable (drag within sidebar)
+      item.draggable = true;
+      item.addEventListener("dragstart", e => {
+        e.dataTransfer.setData("text/plain", note.id);
+        item.classList.add("dragging");
+      });
+      item.addEventListener("dragend", () => item.classList.remove("dragging"));
+
+      // click to reveal note
+      item.addEventListener("click", () => {
+        const noteEl = document.querySelector(`.note-wrapper[data-id='${note.id}']`);
+        if (noteEl) {
+          noteEl.classList.remove("minimized");
+          noteEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          noteEl.style.border = "2px solid #1976d2";
+          setTimeout(() => noteEl.style.border = "", 1000);
+        }
+      });
+
+      itemsDiv.appendChild(item);
+    });
+
+    catDiv.appendChild(itemsDiv);
+    sidebar.appendChild(catDiv);
   });
 }
 
-// create add button if one not present
-function createAddButton() {
-  const button = document.createElement("button");
-  button.className = "add-note";
-  button.textContent = "Add Note";
-  notesContainer.appendChild(button);
-  button.addEventListener("click", addNote);
-  return button;
-}
 
+
+// Create note element
 function createNoteElement(id, content, savedData = {}) {
-  // wrapper
   const wrapper = document.createElement("div");
   wrapper.classList.add("note-wrapper");
-  wrapper.style.position = "absolute";
+  wrapper.dataset.id = id;
   wrapper.style.top = savedData.top || "50px";
   wrapper.style.left = savedData.left || "50px";
   wrapper.style.width = savedData.width || "200px";
   wrapper.style.height = savedData.height || "220px";
-  wrapper.dataset.id = id;
-
-  // apply style
   wrapper.style.background = savedData.color || "#fff59d";
-  const shape = savedData.shape || "rectangle";
-  wrapper.classList.remove("shape-pillow","shape-circle");
-  if (shape === "circle") wrapper.classList.add("shape-circle");
-  if (shape === "pillow") wrapper.classList.add("shape-pillow");
+  wrapper.classList.remove("shape-circle", "shape-pillow");
+  if (savedData.shape === "circle") wrapper.classList.add("shape-circle");
+  if (savedData.shape === "pillow") wrapper.classList.add("shape-pillow");
 
-  // header (category + actions)
+  // ===== HEADER =====
   const header = document.createElement("div");
   header.className = "note-header";
 
-  const categoryInput = document.createElement("input");
-  categoryInput.type = "text";
-  categoryInput.value = savedData.category || "Uncategorized";
-  categoryInput.style.border = "none";
-  categoryInput.style.background = "transparent";
-  categoryInput.style.fontWeight = "bold";
-  categoryInput.style.outline = "none";
+  // Title input (replaces where category used to be)
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.placeholder = "Title";
+  titleInput.value = savedData.title || "Untitled";
+  titleInput.style.border = "none";
+  titleInput.style.background = "transparent";
+  titleInput.style.fontWeight = "bold";
+  titleInput.style.outline = "none";
+  titleInput.style.flex = "1";
 
+  // Actions
   const actions = document.createElement("div");
   actions.className = "note-actions";
 
+  const minimizeBtn = document.createElement("button");
+  minimizeBtn.className = "small";
+  minimizeBtn.textContent = "-";
+  minimizeBtn.addEventListener("click", () => {
+    wrapper.classList.toggle("minimized");
+    updateNote(id, textarea.value, wrapper, titleInput.value, savedData);
+  });
+
   const styleBtn = document.createElement("button");
-  styleBtn.title = "Style";
   styleBtn.className = "small";
   styleBtn.textContent = "Style";
+  styleBtn.addEventListener("click", (ev) => {
+    let pickerEl = document.querySelector(".style-picker");
+    if (pickerEl) {
+      pickerEl.remove();
+      return;
+    }
+    pickerEl = createStylePicker(
+      { color: savedData.color, shape: savedData.shape },
+      ({ color, shape }) => {
+        if (color) {
+          wrapper.style.background = color;
+          updateNote(id, textarea.value, wrapper, titleInput.value, { color });
+        }
+        if (shape) {
+          wrapper.classList.remove("shape-pillow", "shape-circle");
+          if (shape === "circle") wrapper.classList.add("shape-circle");
+          if (shape === "pillow") wrapper.classList.add("shape-pillow");
+          updateNote(id, textarea.value, wrapper, titleInput.value, { shape });
+        }
+      }
+    );
+    document.body.appendChild(pickerEl);
+    const rect = ev.target.getBoundingClientRect();
+    pickerEl.style.left = rect.right + "px";
+    pickerEl.style.top = rect.top + "px";
+  });
 
   const reminderBtn = document.createElement("button");
-  reminderBtn.title = "Set reminder";
   reminderBtn.className = "small";
   reminderBtn.textContent = savedData.reminderDate ? "🔔" : "🔕";
+  reminderBtn.addEventListener("click", async () => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      await notificationService.requestPermission();
+    }
+    const input = prompt("Enter ISO datetime or blank to clear:", savedData.reminderDate || "");
+    if (input === null) return;
+    if (input.trim() === "") {
+      savedData.reminderDate = null;
+      reminderBtn.textContent = "🔕";
+      updateNote(id, textarea.value, wrapper, titleInput.value, { reminderDate: null });
+      reminderScheduler.clear(id);
+      return;
+    }
+    const dt = new Date(input);
+    if (isNaN(dt)) {
+      alert("Invalid date format");
+      return;
+    }
+    savedData.reminderDate = dt.toISOString();
+    reminderBtn.textContent = "🔔";
+    updateNote(id, textarea.value, wrapper, titleInput.value, { reminderDate: dt.toISOString() });
+    reminderScheduler.schedule(Object.assign({}, savedData, { id }));
+  });
 
-  actions.appendChild(styleBtn);
-  actions.appendChild(reminderBtn);
+  actions.append(minimizeBtn, styleBtn, reminderBtn);
+  header.append(titleInput, actions);
 
-  header.appendChild(categoryInput);
-  header.appendChild(actions);
-
-  // textarea content
+  // ===== TEXTAREA =====
   const textarea = document.createElement("textarea");
   textarea.className = "note";
   textarea.value = content;
   textarea.placeholder = "Empty Sticky Note";
 
-  // footer (delete)
+  // ===== FOOTER =====
   const footer = document.createElement("div");
   footer.className = "note-footer";
 
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "note-delete";
   deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", () => {
+    if (confirm("Delete this sticky note?")) deleteNote(id, wrapper);
+  });
 
   footer.appendChild(deleteBtn);
+  wrapper.append(header, textarea, footer);
 
-  // append
-  wrapper.appendChild(header);
-  wrapper.appendChild(textarea);
-  wrapper.appendChild(footer);
+  // ===== Auto-save behavior =====
+  textarea.addEventListener("input", () => updateNote(id, textarea.value, wrapper, titleInput.value, savedData));
+  titleInput.addEventListener("change", () => updateNote(id, textarea.value, wrapper, titleInput.value, savedData));
 
-  // Persist changes on change events
-  textarea.addEventListener("input", () => {
-    updateNote(id, textarea.value, wrapper, categoryInput.value);
-  });
-  categoryInput.addEventListener("change", () => {
-    updateNote(id, textarea.value, wrapper, categoryInput.value);
-  });
-
-  deleteBtn.addEventListener("click", () => {
-    const ok = confirm("Delete this sticky note?");
-    if (ok) deleteNote(id, wrapper);
-  });
-
-  // style picker popup
-  let pickerEl = null;
-  styleBtn.addEventListener("click", (ev) => {
-    if (pickerEl) {
-      pickerEl.remove();
-      pickerEl = null;
-      return;
-    }
-    const initial = { color: savedData.color || "#fff59d", shape: savedData.shape || "rectangle" };
-    pickerEl = createStylePicker(initial, ({ color, shape }) => {
-      if (color) {
-        wrapper.style.background = color;
-        // update note data & persist
-        updateNote(id, textarea.value, wrapper, categoryInput.value, { color });
-      }
-      if (shape) {
-        wrapper.classList.remove("shape-pillow","shape-circle");
-        if (shape === "circle") wrapper.classList.add("shape-circle");
-        if (shape === "pillow") wrapper.classList.add("shape-pillow");
-        updateNote(id, textarea.value, wrapper, categoryInput.value, { shape });
-      }
-    });
-    // place popup near button
-    document.body.appendChild(pickerEl);
-    const rect = ev.target.getBoundingClientRect();
-    pickerEl.style.left = rect.right + "px";
-    pickerEl.style.top = rect.top + "px";
-
-    // clicking outside removes picker
-    const onDocClick = (e) => {
-      if (!pickerEl.contains(e.target) && e.target !== styleBtn) {
-        pickerEl.remove();
-        pickerEl = null;
-        document.removeEventListener("click", onDocClick);
-      }
-    };
-    document.addEventListener("click", onDocClick);
-  });
-
-  // reminder selector (simple prompt for date/time ISO string)
-  reminderBtn.addEventListener("click", async () => {
-    // ask permission if needed
-    if ("Notification" in window && Notification.permission !== "granted") {
-      const perm = await notificationService.requestPermission();
-      if (perm !== "granted") {
-        alert("Notifications permission not granted. Reminders will not produce desktop notifications.");
-      }
-    }
-    const current = savedData.reminderDate || "";
-    const input = prompt("Enter reminder ISO datetime (YYYY-MM-DDTHH:MM:SS) or blank to clear:", current);
-    if (input === null) return;
-    const trimmed = (input || "").trim();
-    if (trimmed === "") {
-      savedData.reminderDate = null;
-      reminderBtn.textContent = "🔕";
-      updateNote(id, textarea.value, wrapper, categoryInput.value, { reminderDate: null });
-      reminderScheduler.clear(id);
-      return;
-    }
-    // validate
-    const dt = new Date(trimmed);
-    if (isNaN(dt.getTime())) {
-      alert("Invalid date format.");
-      return;
-    }
-    savedData.reminderDate = dt.toISOString();
-    reminderBtn.textContent = "🔔";
-    updateNote(id, textarea.value, wrapper, categoryInput.value, { reminderDate: dt.toISOString() });
-    // schedule
-    reminderScheduler.schedule(Object.assign({}, savedData, { id }));
-  });
-
-  // Dragging wrapper (drag from header area)
-  let isDragging = false, offsetX=0, offsetY=0;
+  // ===== Dragging =====
+  let isDragging = false, offsetX, offsetY;
   header.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     isDragging = true;
-    offsetX = e.offsetX;
-    offsetY = e.offsetY;
+    const rect = wrapper.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
     wrapper.style.cursor = "grabbing";
   });
+
   document.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    wrapper.style.left = (e.pageX - offsetX) + "px";
-    wrapper.style.top = (e.pageY - offsetY) + "px";
+    const containerRect = notesContainer.getBoundingClientRect();
+    wrapper.style.left = e.clientX - containerRect.left - offsetX + "px";
+    wrapper.style.top = e.clientY - containerRect.top - offsetY + "px";
   });
+
   document.addEventListener("mouseup", () => {
     if (isDragging) {
       isDragging = false;
       wrapper.style.cursor = "move";
-      updateNote(id, textarea.value, wrapper, categoryInput.value);
+      updateNoteLayout(wrapper);
+      updateNote(id, textarea.value, wrapper, titleInput.value, savedData);
     }
   });
 
-  // resizing: watch for mouseup to save size & pos
-  wrapper.addEventListener("mouseup", () => {
-    updateNote(id, textarea.value, wrapper, categoryInput.value);
-  });
+  // ===== Resize observer =====
+  const ro = new ResizeObserver(() => updateNoteLayout(wrapper));
+  ro.observe(wrapper);
 
   return wrapper;
 }
 
-// Small util: create style picker element (we import the function earlier)
-function createStylePicker(initial, onChange) {
-  // fallback: if imported module not available at runtime, create minimal picker
-  // actual implementation lives in components/NoteStylePicker.js; but include fallback just in case
-  return (window.__createStylePicker && window.__createStylePicker(initial,onChange)) || (function () {
-    const root = document.createElement("div");
-    root.className = "style-picker";
-    root.innerHTML = "<div>Style picker</div>";
-    return root;
-  })();
+
+
+// dynamic layout for header/footer/textarea
+function updateNoteLayout(wrapper){
+  const header = wrapper.querySelector(".note-header");
+  const footer = wrapper.querySelector(".note-footer");
+  const textarea = wrapper.querySelector(".note");
+  if(!textarea || !header || !footer) return;
+  const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
+  header.style.width=w+"px"; footer.style.width=w+"px";
+  textarea.style.width=w+"px"; textarea.style.height=(h-header.offsetHeight-footer.offsetHeight)+"px";
 }
 
 function addNote() {
   const notes = getNotes();
-  const noteObject = {
-    id: Math.floor(Math.random() * 1000000).toString(),
-    content: "",
-    category: "Uncategorized",
-    top: "50px",
-    left: "50px",
-    width: "200px",
-    height: "220px",
-    color: "#fff59d",
-    shape: "rectangle",
-    reminderDate: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  notes.push(noteObject);
+const noteObject = { 
+  id: Math.floor(Math.random()*1000000).toString(),
+  title: "Untitled",
+  content: "",
+  category: "Uncategorized",
+  top: "50px", left: "50px", width: "300px", height: "220px",
+  color: "#fff59d", shape: "rectangle", reminderDate: null,
+  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+};  notes.push(noteObject); saveNotes(notes); renderAllNotes(); updateSidebar();
+}
+
+function updateNote(id, newContent, element, newTitle = "Untitled", extras = {}) {
+  const notes = getNotes();
+  const target = notes.find(n => n.id == id);
+  if (!target) return;
+
+  target.content = newContent;
+  target.title = newTitle; 
+  target.top = element.style.top;
+  target.left = element.style.left;
+  target.width = element.style.width;
+  target.height = element.style.height;
+
+  if (extras.color !== undefined) target.color = extras.color;
+  if (extras.shape !== undefined) target.shape = extras.shape;
+  if (extras.reminderDate !== undefined) target.reminderDate = extras.reminderDate;
+
+  target.updatedAt = new Date().toISOString();
   saveNotes(notes);
+  updateSidebar();
+}
+
+
+function deleteNote(id,element){ const notes=getNotes().filter(n=>n.id!=id); saveNotes(notes); if(element&&element.parentNode===notesContainer) notesContainer.removeChild(element); reminderScheduler.clear(id); updateSidebar(); }
+
+function renderAllNotes(filterQuery="") {
+  Array.from(notesContainer.querySelectorAll(".note-wrapper")).forEach(n=>n.remove());
+  const notes = searchService.filter(getNotes(),filterQuery);
+  notes.forEach(note=>{ const el=createNoteElement(note.id,note.content,note); el.style.top=note.top; el.style.left=note.left; el.style.width=note.width; el.style.height=note.height; notesContainer.insertBefore(el,addNoteButton); });
+  updateSidebar();
+}
+
+// init
+init();
+function init(){
+  addNoteButton = notesContainer.querySelector(".add-note");
+  if(addNoteButton) addNoteButton.addEventListener("click", addNote);
   renderAllNotes();
+  if("Notification" in window && Notification.permission!=="granted") notificationService.requestPermission();
+  reminderScheduler.rescheduleAll(getNotes());
+  searchInput.addEventListener("input",(e)=>renderAllNotes(e.target.value));
 }
 
-function updateNote(id, newContent, element, newCategory = "Uncategorized", extras = {}) {
-  const notes = getNotes();
-  const targetNote = notes.find(note => note.id == id);
-  if (targetNote) {
-    targetNote.content = newContent;
-    targetNote.category = newCategory || "Uncategorized";
-    targetNote.top = element.style.top || element.getAttribute("data-top") || targetNote.top;
-    targetNote.left = element.style.left || element.getAttribute("data-left") || targetNote.left;
-    targetNote.width = element.style.width || element.getAttribute("data-width") || targetNote.width;
-    targetNote.height = element.style.height || element.getAttribute("data-height") || targetNote.height;
-    if (extras.color !== undefined) targetNote.color = extras.color;
-    if (extras.shape !== undefined) targetNote.shape = extras.shape;
-    if (extras.reminderDate !== undefined) targetNote.reminderDate = extras.reminderDate;
-    targetNote.updatedAt = new Date().toISOString();
-    saveNotes(notes);
-  }
-}
 
-function deleteNote(id, element) {
-  const notes = getNotes().filter(note => note.id != id);
-  saveNotes(notes);
-  if (element && element.parentNode === notesContainer) {
-    notesContainer.removeChild(element);
-  }
-  reminderScheduler.clear(id);
-}
 
-// render and re-render
-function renderAllNotes(filterQuery = "") {
-  // remove existing note wrappers (but keep toolbar/search/add button)
-  const preserved = new Set();
-  // preserve toolbar, searchbar, and add button by removing only .note-wrapper elements
-  const existing = Array.from(notesContainer.querySelectorAll(".note-wrapper"));
-  existing.forEach(n => n.remove());
-
-  const notes = getNotes();
-  const filtered = searchService.filter(notes, filterQuery);
-
-  // create DOM elements for notes
-  filtered.forEach(note => {
-    const el = createNoteElement(note.id, note.content, note);
-    // make sure size/position are applied from saved data
-    el.style.top = note.top || el.style.top;
-    el.style.left = note.left || el.style.left;
-    el.style.width = note.width || el.style.width;
-    el.style.height = note.height || el.style.height;
-    notesContainer.insertBefore(el, addNoteButton);
-  });
-}
-
-// Expose some helpers to console for debugging
-window._stickies = {
-  getNotes,
-  saveNotes,
-  renderAllNotes,
-  addNote
-};
+// expose helpers
+window._stickies={getNotes, saveNotes, renderAllNotes, addNote};

@@ -1,4 +1,4 @@
-/* main.css - combine with your existing CSS */
+/* main.css - Updated for sidebar and minimized notes */
 body {
   margin: 0;
   font-family: sans-serif;
@@ -7,17 +7,70 @@ body {
   overflow: hidden;
 }
 
+/* Sidebar */
+#notes-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 100%;
+  background: #f0f0f0;
+  padding: 8px;
+  overflow-y: auto;
+  box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+  z-index: 1000;
+}
+.add-note {
+  position: absolute;
+  top: 8px;      /* adjust vertical position */
+  right: 24px;   /* adjust horizontal position */
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #1976d2;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+  transition: background 0.2s;
+}
+
+.add-note:hover {
+  background: #115293;
+}
+.sidebar-item {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background .15s;
+}
+
+
+.sidebar-item:hover {
+  background: #e0e0e0;
+}
+
+/* Notes container */
 #app {
-  position: relative; /* notes positioned inside */
-  width: 100%;
+  margin-left: 200px; /* leave space for sidebar */
+  position: relative;
+  width: calc(100% - 200px);
   height: 100%;
 }
 
 /* Toolbar at top-left */
 .toolbar {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 0px;
+  left: 30px;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -39,16 +92,11 @@ body {
   background: rgba(0,0,0,0.04);
 }
 
-.toolbar img {
-  width: 22px;
-  height: 22px;
-}
-
 /* Search bar */
 .search-bar {
   position: absolute;
   top: 8px;
-  left: 160px;
+  left: 600px;
   z-index: 999;
   display:flex;
   align-items:center;
@@ -66,7 +114,7 @@ body {
   width: 260px;
 }
 
-/* Wrapper for each sticky note */
+/* Note wrapper */
 .note-wrapper {
   position: absolute;
   background: #fff59d;
@@ -75,12 +123,12 @@ body {
   overflow: hidden;
   cursor: move;
   display: flex;
-  flex-direction: column; /* stack header + content */
+  flex-direction: column;
   resize: both;
   transition: box-shadow .12s;
 }
 
-/* shape variations */
+/* Shape variations */
 .note-wrapper.shape-circle {
   border-radius: 50%;
   overflow: hidden;
@@ -89,7 +137,13 @@ body {
   border-radius: 16px;
 }
 
-/* Category header at top of note */
+/* Minimized notes */
+.note-wrapper.minimized .note,
+.note-wrapper.minimized .note-footer {
+  display: none;
+}
+
+/* Note header */
 .note-header {
   background: #f0e45c;
   border-bottom: 1px solid #d6c700;
@@ -107,7 +161,7 @@ body {
   justify-content:space-between;
 }
 
-/* actions in header (style button + reminder icon) */
+/* Note actions */
 .note-actions {
   display:flex;
   gap:6px;
@@ -116,7 +170,7 @@ body {
 
 /* Note content */
 .note {
-  flex-grow: 1;        /* fill remaining space */
+  flex-grow: 1;
   width: 100%;
   padding: 6px 8px;
   border: none;
@@ -129,7 +183,7 @@ body {
   cursor: text;
 }
 
-/* style picker popup */
+/* Style picker popup */
 .style-picker {
   position: absolute;
   z-index: 10000;
@@ -153,7 +207,7 @@ body {
   margin-right:6px;
 }
 
-/* footer controls (delete, reminder) */
+/* Note footer */
 .note-footer {
   padding: 6px;
   display:flex;
@@ -161,7 +215,7 @@ body {
   gap:8px;
 }
 
-/* delete button */
+/* Delete button */
 .note-delete {
   border: none;
   background: #ef5350;
@@ -175,10 +229,6 @@ body {
   font-size: 12px;
   padding: 6px;
 }
-
-/* compact icons row in note header */
-.icon {
-  width:18px;
-  height:18px;
-  display:inline-block;
+.note-wrapper.minimized {
+  display: none;
 }
