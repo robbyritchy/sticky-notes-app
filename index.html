@@ -6,10 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sticky Notes App</title>
   <link rel="stylesheet" href="src/main.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings:
+        'FILL' 1,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24;
+    }
+  </style>
+  </style>
+  <script type="text/javascript" src ="darkmode.js" defer></script>
 </head>
-<body>
+<body >
+  
   <div id="app">
     <button class="add-note" type="button">+</button>
+    <button id="theme-switch">
+      <span class="material-symbols-outlined">dark_mode</span>
+      <span class="material-symbols-outlined">light_mode</span>
+    </button>
   </div>
 
   <script type="module" src="src/main.js"></script>

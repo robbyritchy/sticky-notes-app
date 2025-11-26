@@ -1,8 +1,25 @@
 /* main.css - Updated for sidebar and minimized notes */
+
+:root {
+  --base-color: #fdfdfd;
+  --text-color: #000000;
+  --side-bar: #f0f0f0;
+  --side-item: white;
+  --box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+}
+
+.darkmode{
+  --base-color: #1e1e1e;
+  --text-color: #f0f0f0;
+  --side-bar: #000000;
+  --side-item: #474747;
+  --box-shadow: 2px 0 6px rgba(255, 255, 255, 0.1);
+}
+
 body {
   margin: 0;
   font-family: sans-serif;
-  background: #fdfdfd;
+  background: var(--base-color);
   height: 100vh;
   overflow: hidden;
 }
@@ -14,10 +31,11 @@ body {
   top: 0;
   width: 200px;
   height: 100%;
-  background: #f0f0f0;
+  background: var(--side-bar);
+  color: var(--text-color);
   padding: 8px;
   overflow-y: auto;
-  box-shadow: 2px 0 6px rgba(0,0,0,0.1);
+  box-shadow: var(--box-shadow);
   z-index: 1000;
 }
 .add-note {
@@ -46,7 +64,7 @@ body {
 .sidebar-item {
   padding: 6px 8px;
   margin-bottom: 4px;
-  background: white;
+  background: var(--side-item);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
@@ -102,6 +120,7 @@ body {
   align-items:center;
   gap:6px;
   background: white;
+  
   border-radius: 6px;
   padding: 6px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -110,6 +129,7 @@ body {
 .search-bar input {
   border: none;
   outline: none;
+  color:var(--text-color);
   font-size: 14px;
   width: 260px;
 }
@@ -231,4 +251,40 @@ body {
 }
 .note-wrapper.minimized {
   display: none;
+}
+
+#theme-switch {
+  position: absolute;   /* position relative to #app */
+  top: 8px;             /* distance from top */
+  right: 80px;           /* distance from right */
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #1976d2;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;        /* above notes/sidebar */
+  box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+  transition: background 0.2s;
+}
+
+#theme-switch:hover {
+  background: #115293;
+}
+
+/* optional: hide the inactive icon inside button */
+#theme-switch span:last-child {
+  display: none; /* show all spans */
+}
+
+.darkmode #theme-switch span:first-child {
+  display: none; /* hide light icon */
+}
+
+.darkmode #theme-switch span:last-child {
+  display: block; /* hide light icon */
 }
