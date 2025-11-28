@@ -9,15 +9,16 @@
 }
 
 .darkmode{
-  --base-color: #1e1e1e;
+  --base-color: #111111;
   --text-color: #f0f0f0;
-  --side-bar: #000000;
-  --side-item: #474747;
-  --box-shadow: 2px 0 6px rgba(255, 255, 255, 0.1);
+  --side-bar: #343434;
+  --side-item: #242424;
+  --box-shadow: 2px 0 6px rgba(68, 68, 68, 0.1);
 }
 
 body {
   margin: 0;
+  padding-top: 15px;
   font-family: sans-serif;
   background: var(--base-color);
   height: 100vh;
@@ -28,7 +29,7 @@ body {
 #notes-sidebar {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 10px;
   width: 200px;
   height: 100%;
   background: var(--side-bar);
@@ -74,6 +75,7 @@ body {
 
 .sidebar-item:hover {
   background: #e0e0e0;
+  color: #000000;
 }
 
 /* Notes container */
@@ -98,6 +100,7 @@ body {
 .toolbar button {
   border: none;
   background: transparent;
+  color: var(--text-color);
   cursor: pointer;
   padding: 6px;
   border-radius: 6px;
@@ -128,7 +131,7 @@ body {
 .search-bar input {
   border: none;
   outline: none;
-
+  color:#000000;
   font-size: 14px;
   width: 260px;
 }
@@ -206,7 +209,8 @@ body {
 .style-picker {
   position: absolute;
   z-index: 10000;
-  background: white;
+  background: var(--base-color);
+  color: var(--text-color);
   border: 1px solid #e6e6e6;
   box-shadow: 0 6px 18px rgba(0,0,0,0.12);
   padding: 8px;
@@ -275,15 +279,15 @@ body {
   background: #115293;
 }
 
-/* optional: hide the inactive icon inside button */
+
 #theme-switch span:last-child {
-  display: none; /* show all spans */
+  display: none; 
 }
 
 .darkmode #theme-switch span:first-child {
-  display: none; /* hide light icon */
+  display: none; 
 }
 
 .darkmode #theme-switch span:last-child {
-  display: block; /* hide light icon */
+  display: block; 
 }
