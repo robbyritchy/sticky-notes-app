@@ -18,7 +18,6 @@
 
 body {
   margin: 0;
-  padding-top: 15px;
   font-family: sans-serif;
   background: var(--base-color);
   height: 100vh;
@@ -29,7 +28,7 @@ body {
 #notes-sidebar {
   position: absolute;
   left: 0;
-  top: 10px;
+  top: 0;
   width: 200px;
   height: 100%;
   background: var(--side-bar);
