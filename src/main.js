@@ -4,6 +4,46 @@ import { FilePicker } from "./components/FilePicker.js";
 import { createStylePicker } from "./components/NoteStylePicker.js";
 import { searchService } from "./services/searchService.js";
 import { notificationService, reminderScheduler } from "./services/notificationService.js";
+import { versionHistoryService } from "./services/versionHistoryService.js";
+import { syncManagerService } from "./services/syncManagerService.js";
+import { createHistoryModal } from "./components/HistoryModal.js";
+import { sharingService } from "./services/sharingService.js";
+import { checklistService } from "./services/checklistService.js";
+import { createShareModal } from "./components/ShareModal.js";
+import { createSharedNoteView } from "./components/SharedNoteView.js";
+
+// ============================================================================
+// Feature Tasks - IMPLEMENTED
+// ============================================================================
+//
+// Local Storage for Offline Notes
+// #71 ✅ Implement local storage for offline notes (using localStorage)
+// #72 ✅ Develop sync manager service
+// #73 ⚠️ Update backend for version control (placeholder - ready for backend integration)
+// #74 ✅ Add sync status and error messages
+//
+// Activity Log / Version History (#63)
+// #75 ✅ Implement version tracking for notes
+// #76 ✅ Create "History" modal UI
+// #77 ✅ Add version preview before restore
+// #78 ✅ Implement restore functionality
+// #79 ✅ Persist version history data
+//
+// Collaboration (Share Notes) (#62)
+// #80 ✅ Generate shareable link for notes
+// #81 ✅ Create shared note read-only view
+// #82 ✅ Update shared note when owner edits
+// #83 ✅ Handle revoked link access
+// #84 ✅ Test sharing flow and permissions
+//
+// Checklist / To-Do Notes (#65)
+// #85 ✅ Add dynamic checklist item creation
+// #86 ✅ Implement check/uncheck functionality
+// #87 ✅ Apply visual updates for completed items
+// #88 ✅ Persist checklist state after reload
+// #89 ✅ Convert existing notes into checklists
+//
+// ============================================================================
 
 const notesContainer = document.getElementById("app");
 let addNoteButton = notesContainer.querySelector(".add-note");
@@ -104,7 +144,69 @@ toolbar.appendChild(exportWrapper);
 
 
 const styleLegendBtn = document.createElement("button"); styleLegendBtn.textContent = "Style";
-toolbar.appendChild(importBtn);  toolbar.appendChild(styleLegendBtn);
+
+// Sync status indicator
+const syncStatusContainer = document.createElement("div");
+syncStatusContainer.className = "sync-status";
+syncStatusContainer.style.cssText = `
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #666;
+`;
+
+const syncStatusIcon = document.createElement("span");
+syncStatusIcon.style.cssText = `
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #999;
+  display: inline-block;
+`;
+
+const syncStatusText = document.createElement("span");
+syncStatusText.textContent = "Offline";
+
+syncStatusContainer.appendChild(syncStatusIcon);
+syncStatusContainer.appendChild(syncStatusText);
+
+// Update sync status display
+function updateSyncStatus(status) {
+  const colors = {
+    offline: "#999",
+    syncing: "#ff9800",
+    online: "#4caf50",
+    error: "#f44336"
+  };
+  const labels = {
+    offline: "Offline",
+    syncing: "Syncing...",
+    online: "Synced",
+    error: "Sync Error"
+  };
+  
+  syncStatusIcon.style.background = colors[status.status] || "#999";
+  syncStatusText.textContent = labels[status.status] || "Unknown";
+  
+  if (status.error) {
+    syncStatusText.textContent = status.error;
+    syncStatusText.title = status.error;
+  } else {
+    syncStatusText.title = status.lastSync 
+      ? `Last sync: ${new Date(status.lastSync).toLocaleString()}`
+      : "Never synced";
+  }
+}
+
+// Subscribe to sync status changes
+syncManagerService.onStatusChange(updateSyncStatus);
+
+toolbar.appendChild(importBtn);
+toolbar.appendChild(styleLegendBtn);
+toolbar.appendChild(syncStatusContainer);
 notesContainer.appendChild(toolbar);
 
 // search bar
@@ -342,83 +444,450 @@ function createNoteElement(id, content, savedData = {}) {
   titleInput.style.outline = "none";
   titleInput.style.flex = "1";
 
-  // Actions
+  // Actions - Dropdown menu
   const actions = document.createElement("div");
   actions.className = "note-actions";
+  actions.style.position = "relative";
 
-  const minimizeBtn = document.createElement("button");
-  minimizeBtn.className = "small";
-  minimizeBtn.textContent = "-";
-  minimizeBtn.addEventListener("click", () => {
-    wrapper.classList.toggle("minimized");
-    updateNote(id, textarea.value, wrapper, titleInput.value, savedData);
-  });
+  // Dropdown wrapper
+  const dropdownWrapper = document.createElement("div");
+  dropdownWrapper.className = "note-actions-dropdown";
+  dropdownWrapper.style.cssText = "position: relative; display: inline-block;";
 
-  const styleBtn = document.createElement("button");
-  styleBtn.className = "small";
-  styleBtn.textContent = "Style";
-  styleBtn.addEventListener("click", (ev) => {
-    let pickerEl = document.querySelector(".style-picker");
-    if (pickerEl) {
-      pickerEl.remove();
-      return;
-    }
-    pickerEl = createStylePicker(
-      { color: savedData.color, shape: savedData.shape },
-      ({ color, shape }) => {
-        if (color) {
-          wrapper.style.background = color;
-          updateNote(id, textarea.value, wrapper, titleInput.value, { color });
-        }
-        if (shape) {
-          wrapper.classList.remove("shape-pillow", "shape-circle");
-          if (shape === "circle") wrapper.classList.add("shape-circle");
-          if (shape === "pillow") wrapper.classList.add("shape-pillow");
-          updateNote(id, textarea.value, wrapper, titleInput.value, { shape });
-        }
+  // Dropdown button
+  const menuBtn = document.createElement("button");
+  menuBtn.className = "small";
+  menuBtn.textContent = "⋯";
+  menuBtn.title = "Note options";
+  menuBtn.style.cssText = `
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 8px;
+  `;
+
+  // Dropdown menu
+  const dropdown = document.createElement("div");
+  dropdown.className = "note-actions-dropdown-menu";
+  dropdown.style.cssText = `
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 4px 0;
+    display: none;
+    z-index: 10000;
+    min-width: 180px;
+    border-radius: 4px;
+    margin-top: 4px;
+  `;
+
+  // Build dropdown items
+  function buildDropdownMenu() {
+    dropdown.innerHTML = "";
+    const noteIsChecklist = checklistService.isChecklist(savedData);
+    const notes = getNotes();
+    const note = notes.find(n => n.id === id);
+
+    // Minimize
+    const minimizeItem = createDropdownItem(
+      wrapper.classList.contains("minimized") ? "Expand" : "Minimize",
+      () => {
+        wrapper.classList.toggle("minimized");
+        const content = textarea ? textarea.value : "";
+        updateNote(id, content, wrapper, titleInput.value, savedData);
+        dropdown.style.display = "none";
       }
     );
-    document.body.appendChild(pickerEl);
-    const rect = ev.target.getBoundingClientRect();
-    pickerEl.style.left = rect.right + "px";
-    pickerEl.style.top = rect.top + "px";
+    dropdown.appendChild(minimizeItem);
+
+    // Style
+    const styleItem = createDropdownItem("Style", (ev) => {
+      let pickerEl = document.querySelector(".style-picker");
+      if (pickerEl) {
+        pickerEl.remove();
+      } else {
+        pickerEl = createStylePicker(
+          { color: savedData.color, shape: savedData.shape },
+          ({ color, shape }) => {
+            if (color) {
+              wrapper.style.background = color;
+              const content = textarea ? textarea.value : "";
+              updateNote(id, content, wrapper, titleInput.value, { color });
+            }
+            if (shape) {
+              wrapper.classList.remove("shape-pillow", "shape-circle");
+              if (shape === "circle") wrapper.classList.add("shape-circle");
+              if (shape === "pillow") wrapper.classList.add("shape-pillow");
+              const content = textarea ? textarea.value : "";
+              updateNote(id, content, wrapper, titleInput.value, { shape });
+            }
+          }
+        );
+        document.body.appendChild(pickerEl);
+        const rect = menuBtn.getBoundingClientRect();
+        pickerEl.style.left = rect.right + "px";
+        pickerEl.style.top = rect.top + "px";
+      }
+      dropdown.style.display = "none";
+    });
+    dropdown.appendChild(styleItem);
+
+    // Reminder
+    const reminderItem = createDropdownItem(
+      savedData.reminderDate ? "🔔 Edit Reminder" : "🔕 Set Reminder",
+      async () => {
+        if ("Notification" in window && Notification.permission !== "granted") {
+          await notificationService.requestPermission();
+        }
+        const input = prompt("Enter ISO datetime or blank to clear:", savedData.reminderDate || "");
+        if (input === null) {
+          dropdown.style.display = "none";
+          return;
+        }
+        if (input.trim() === "") {
+          savedData.reminderDate = null;
+          const content = textarea ? textarea.value : "";
+          updateNote(id, content, wrapper, titleInput.value, { reminderDate: null });
+          reminderScheduler.clear(id);
+        } else {
+          const dt = new Date(input);
+          if (isNaN(dt)) {
+            alert("Invalid date format");
+          } else {
+            savedData.reminderDate = dt.toISOString();
+            const content = textarea ? textarea.value : "";
+            updateNote(id, content, wrapper, titleInput.value, { reminderDate: dt.toISOString() });
+            reminderScheduler.schedule(Object.assign({}, savedData, { id }));
+          }
+        }
+        dropdown.style.display = "none";
+      }
+    );
+    dropdown.appendChild(reminderItem);
+
+    // Divider
+    dropdown.appendChild(createDivider());
+
+    // History
+    const historyItem = createDropdownItem("📜 Version History", () => {
+      if (!note) {
+        dropdown.style.display = "none";
+        return;
+      }
+      const modal = createHistoryModal(
+        id,
+        note.title || "Untitled",
+        (version) => {
+          const restored = versionHistoryService.restoreVersion(id, version.id, notes);
+          if (restored) {
+            const updatedNotes = notes.map(n => n.id === id ? restored : n);
+            saveNotes(updatedNotes);
+            renderAllNotes();
+            updateSidebar();
+            alert("Note restored to selected version.");
+          }
+        }
+      );
+      document.body.appendChild(modal);
+      dropdown.style.display = "none";
+    });
+    dropdown.appendChild(historyItem);
+
+    // Share
+    const shareItem = createDropdownItem(
+      savedData.isShared ? "🔗 Manage Sharing" : "🔗 Share Note",
+      () => {
+        if (!note) {
+          dropdown.style.display = "none";
+          return;
+        }
+        const modal = createShareModal(id, note.title || "Untitled");
+        document.body.appendChild(modal);
+        dropdown.style.display = "none";
+      }
+    );
+    dropdown.appendChild(shareItem);
+
+    // Checklist toggle
+    const checklistItem = createDropdownItem(
+      noteIsChecklist ? "☑ Convert to Regular Note" : "☐ Convert to Checklist",
+      () => {
+        if (!note) {
+          dropdown.style.display = "none";
+          return;
+        }
+        if (noteIsChecklist) {
+          checklistService.convertToRegularNote(note);
+        } else {
+          checklistService.convertToChecklist(note);
+        }
+        saveNotes(notes);
+        renderAllNotes();
+        updateSidebar();
+        dropdown.style.display = "none";
+      }
+    );
+    dropdown.appendChild(checklistItem);
+  }
+
+  function createDropdownItem(text, onClick) {
+    const item = document.createElement("div");
+    item.className = "dropdown-item";
+    item.textContent = text;
+    item.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: background 0.15s;
+    `;
+    item.addEventListener("mouseenter", () => {
+      item.style.background = "#f5f5f5";
+    });
+    item.addEventListener("mouseleave", () => {
+      item.style.background = "transparent";
+    });
+    item.addEventListener("click", onClick);
+    return item;
+  }
+
+  function createDivider() {
+    const divider = document.createElement("div");
+    divider.style.cssText = `
+      height: 1px;
+      background: #eee;
+      margin: 4px 0;
+    `;
+    return divider;
+  }
+
+  // Toggle dropdown
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isVisible = dropdown.style.display === "block";
+    dropdown.style.display = isVisible ? "none" : "block";
+    if (!isVisible) {
+      buildDropdownMenu();
+    }
   });
 
-  const reminderBtn = document.createElement("button");
-  reminderBtn.className = "small";
-  reminderBtn.textContent = savedData.reminderDate ? "🔔" : "🔕";
-  reminderBtn.addEventListener("click", async () => {
-    if ("Notification" in window && Notification.permission !== "granted") {
-      await notificationService.requestPermission();
+  // Close dropdown when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!dropdownWrapper.contains(e.target)) {
+      dropdown.style.display = "none";
     }
-    const input = prompt("Enter ISO datetime or blank to clear:", savedData.reminderDate || "");
-    if (input === null) return;
-    if (input.trim() === "") {
-      savedData.reminderDate = null;
-      reminderBtn.textContent = "🔕";
-      updateNote(id, textarea.value, wrapper, titleInput.value, { reminderDate: null });
-      reminderScheduler.clear(id);
-      return;
-    }
-    const dt = new Date(input);
-    if (isNaN(dt)) {
-      alert("Invalid date format");
-      return;
-    }
-    savedData.reminderDate = dt.toISOString();
-    reminderBtn.textContent = "🔔";
-    updateNote(id, textarea.value, wrapper, titleInput.value, { reminderDate: dt.toISOString() });
-    reminderScheduler.schedule(Object.assign({}, savedData, { id }));
   });
 
-  actions.append(minimizeBtn, styleBtn, reminderBtn);
+  dropdownWrapper.appendChild(menuBtn);
+  dropdownWrapper.appendChild(dropdown);
+  actions.appendChild(dropdownWrapper);
   header.append(titleInput, actions);
 
-  // ===== TEXTAREA =====
-  const textarea = document.createElement("textarea");
-  textarea.className = "note";
-  textarea.value = content;
-  textarea.placeholder = "Empty Sticky Note";
+  // ===== CONTENT AREA =====
+  const contentArea = document.createElement("div");
+  contentArea.className = "note-content-area";
+  contentArea.style.cssText = "flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column;";
+
+  const isChecklist = checklistService.isChecklist(savedData);
+  
+  let textarea = null;
+  let checklistContainer = null;
+
+  if (isChecklist) {
+    // Create checklist UI (#85, #86, #87)
+    checklistContainer = document.createElement("div");
+    checklistContainer.className = "checklist-container";
+    
+    // Progress indicator
+    const progressDiv = document.createElement("div");
+    progressDiv.className = "checklist-progress";
+    progressDiv.style.cssText = `
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 8px;
+      padding: 4px 0;
+    `;
+    checklistContainer.appendChild(progressDiv);
+
+    // Checklist items
+    const itemsList = document.createElement("div");
+    itemsList.className = "checklist-items";
+    
+    // Function to update progress indicator
+    function updateProgress() {
+      const notes = getNotes();
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        const stats = checklistService.getCompletionStats(note);
+        progressDiv.textContent = `${stats.completed}/${stats.total} completed (${stats.percentage}%)`;
+      }
+    }
+    
+    function renderChecklistItems() {
+      itemsList.innerHTML = "";
+      const notes = getNotes();
+      const note = notes.find(n => n.id === id);
+      if (!note || !note.items) {
+        updateProgress();
+        return;
+      }
+
+      note.items.forEach(item => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "checklist-item";
+        itemDiv.style.cssText = `
+          display: flex;
+          align-items: center;
+          padding: 6px;
+          margin-bottom: 4px;
+          background: rgba(255,255,255,0.3);
+          border-radius: 4px;
+          gap: 8px;
+        `;
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = item.checked;
+        checkbox.style.cssText = "cursor: pointer;";
+        checkbox.addEventListener("change", () => {
+          const notes = getNotes();
+          const note = notes.find(n => n.id === id);
+          if (note) {
+            checklistService.toggleItem(note, item.id);
+            saveNotes(notes);
+            renderChecklistItems();
+            updateNote(id, "", wrapper, titleInput.value, savedData);
+          }
+        });
+
+        const itemInput = document.createElement("input");
+        itemInput.type = "text";
+        itemInput.value = item.text;
+        itemInput.placeholder = "Checklist item...";
+        itemInput.style.cssText = `
+          flex: 1;
+          border: none;
+          background: transparent;
+          outline: none;
+          text-decoration: ${item.checked ? "line-through" : "none"};
+          opacity: ${item.checked ? 0.6 : 1};
+          font-size: 14px;
+        `;
+        itemInput.addEventListener("blur", () => {
+          const notes = getNotes();
+          const note = notes.find(n => n.id === id);
+          if (note) {
+            checklistService.updateItemText(note, item.id, itemInput.value);
+            saveNotes(notes);
+            updateNote(id, "", wrapper, titleInput.value, savedData);
+          }
+        });
+        itemInput.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            itemInput.blur();
+            // Add new item
+            const notes = getNotes();
+            const note = notes.find(n => n.id === id);
+            if (note) {
+              checklistService.addItem(note, "");
+              saveNotes(notes);
+              updateProgress();
+              renderChecklistItems();
+              updateNote(id, "", wrapper, titleInput.value, savedData);
+            }
+          } else if (e.key === "Delete" && !itemInput.value.trim()) {
+            const notes = getNotes();
+            const note = notes.find(n => n.id === id);
+            if (note) {
+              checklistService.removeItem(note, item.id);
+              saveNotes(notes);
+              updateProgress();
+              renderChecklistItems();
+              updateNote(id, "", wrapper, titleInput.value, savedData);
+            }
+          }
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "×";
+        deleteBtn.style.cssText = `
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #999;
+          font-size: 18px;
+          padding: 0;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        `;
+        deleteBtn.addEventListener("click", () => {
+          const notes = getNotes();
+          const note = notes.find(n => n.id === id);
+          if (note) {
+            checklistService.removeItem(note, item.id);
+            saveNotes(notes);
+            updateProgress();
+            renderChecklistItems();
+            updateNote(id, "", wrapper, titleInput.value, savedData);
+          }
+        });
+
+        itemDiv.appendChild(checkbox);
+        itemDiv.appendChild(itemInput);
+        itemDiv.appendChild(deleteBtn);
+        itemsList.appendChild(itemDiv);
+      });
+
+      // Add new item button
+      const addItemBtn = document.createElement("button");
+      addItemBtn.textContent = "+ Add Item";
+      addItemBtn.style.cssText = `
+        width: 100%;
+        padding: 8px;
+        margin-top: 8px;
+        background: rgba(255,255,255,0.5);
+        border: 1px dashed #999;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #666;
+      `;
+      addItemBtn.addEventListener("click", () => {
+        const notes = getNotes();
+        const note = notes.find(n => n.id === id);
+        if (note) {
+          checklistService.addItem(note, "");
+          saveNotes(notes);
+          updateProgress();
+          renderChecklistItems();
+          updateNote(id, "", wrapper, titleInput.value, savedData);
+        }
+      });
+      itemsList.appendChild(addItemBtn);
+    }
+
+    // Initial render
+    updateProgress();
+    renderChecklistItems();
+    checklistContainer.appendChild(itemsList);
+    contentArea.appendChild(checklistContainer);
+  } else {
+    // Regular textarea
+    textarea = document.createElement("textarea");
+    textarea.className = "note";
+    textarea.value = content;
+    textarea.placeholder = "Empty Sticky Note";
+    // Ensure textarea doesn't clip - use proper overflow
+    textarea.style.overflow = "auto";
+    textarea.style.wordWrap = "break-word";
+    textarea.style.overflowWrap = "break-word";
+    contentArea.appendChild(textarea);
+  }
 
   // ===== FOOTER =====
   const footer = document.createElement("div");
@@ -432,11 +901,16 @@ function createNoteElement(id, content, savedData = {}) {
   });
 
   footer.appendChild(deleteBtn);
-  wrapper.append(header, textarea, footer);
+  wrapper.append(header, contentArea, footer);
 
   // ===== Auto-save behavior =====
-  textarea.addEventListener("input", () => updateNote(id, textarea.value, wrapper, titleInput.value, savedData));
-  titleInput.addEventListener("change", () => updateNote(id, textarea.value, wrapper, titleInput.value, savedData));
+  if (textarea) {
+    textarea.addEventListener("input", () => updateNote(id, textarea.value, wrapper, titleInput.value, savedData));
+  }
+  titleInput.addEventListener("change", () => {
+    const content = textarea ? textarea.value : "";
+    updateNote(id, content, wrapper, titleInput.value, savedData);
+  });
 
   // ===== Dragging =====
   let isDragging = false, offsetX, offsetY;
@@ -461,13 +935,19 @@ function createNoteElement(id, content, savedData = {}) {
       isDragging = false;
       wrapper.style.cursor = "move";
       updateNoteLayout(wrapper);
-      updateNote(id, textarea.value, wrapper, titleInput.value, savedData);
+      const content = textarea ? textarea.value : "";
+      updateNote(id, content, wrapper, titleInput.value, savedData);
     }
   });
 
   // ===== Resize observer =====
   const ro = new ResizeObserver(() => updateNoteLayout(wrapper));
   ro.observe(wrapper);
+  
+  // Apply initial scaling after DOM is fully rendered
+  requestAnimationFrame(() => {
+    updateNoteLayout(wrapper);
+  });
 
   return wrapper;
 }
@@ -478,11 +958,82 @@ function createNoteElement(id, content, savedData = {}) {
 function updateNoteLayout(wrapper){
   const header = wrapper.querySelector(".note-header");
   const footer = wrapper.querySelector(".note-footer");
+  const contentArea = wrapper.querySelector(".note-content-area");
   const textarea = wrapper.querySelector(".note");
-  if(!textarea || !header || !footer) return;
+  const titleInput = wrapper.querySelector("input[type='text']");
+  if(!header || !footer || !contentArea) return;
   const w = wrapper.offsetWidth, h = wrapper.offsetHeight;
-  header.style.width=w+"px"; footer.style.width=w+"px";
-  textarea.style.width=w+"px"; textarea.style.height=(h-header.offsetHeight-footer.offsetHeight)+"px";
+  header.style.width=w+"px"; 
+  footer.style.width=w+"px";
+  contentArea.style.width=w+"px";
+  
+  // Calculate available height for content area
+  const headerHeight = header.offsetHeight;
+  const footerHeight = footer.offsetHeight;
+  const availableHeight = h - headerHeight - footerHeight;
+  
+  if (textarea) {
+    // For textarea, set contentArea height and let textarea fill it
+    contentArea.style.height = availableHeight + "px";
+    contentArea.style.minHeight = "0"; // Allow flex shrinking
+    textarea.style.width = "100%";
+    textarea.style.height = "100%";
+    textarea.style.boxSizing = "border-box";
+  } else {
+    // Checklist container - set height directly
+    contentArea.style.height = availableHeight + "px";
+    contentArea.style.overflowY = "auto";
+  }
+  
+  // Scale header elements based on note size
+  // Base size is 200px width, scale proportionally
+  const baseWidth = 200;
+  const scale = Math.max(0.8, Math.min(1.5, w / baseWidth)); // Clamp between 0.8x and 1.5x (increased min from 0.7)
+  
+  // Scale header font size
+  const baseFontSize = 14;
+  header.style.fontSize = (baseFontSize * scale) + "px";
+  
+  // Scale title input
+  if (titleInput) {
+    titleInput.style.fontSize = (baseFontSize * scale) + "px";
+  }
+  
+  // Scale buttons in header - ensure minimum visible size
+  const buttons = header.querySelectorAll("button");
+  buttons.forEach(btn => {
+    const baseBtnFontSize = 12;
+    const baseBtnPadding = 6;
+    const minButtonSize = 20; // Minimum button size in pixels
+    const calculatedSize = 24 * scale;
+    
+    btn.style.fontSize = (baseBtnFontSize * scale) + "px";
+    btn.style.padding = (baseBtnPadding * scale) + "px";
+    btn.style.minWidth = Math.max(minButtonSize, calculatedSize) + "px";
+    btn.style.minHeight = Math.max(minButtonSize, calculatedSize) + "px";
+    btn.style.display = "inline-flex"; // Ensure buttons are visible
+    btn.style.alignItems = "center";
+    btn.style.justifyContent = "center";
+  });
+  
+  // Scale header padding
+  const basePadding = 6;
+  header.style.padding = (basePadding * scale) + "px " + (basePadding * 1.3 * scale) + "px";
+  
+  // Scale textarea font size
+  const baseTextareaFontSize = 14;
+  textarea.style.fontSize = (baseTextareaFontSize * scale) + "px";
+  textarea.style.padding = (basePadding * scale) + "px " + (basePadding * 1.3 * scale) + "px";
+  
+  // Scale footer elements
+  const footerButtons = footer.querySelectorAll("button");
+  footerButtons.forEach(btn => {
+    const baseBtnFontSize = 12;
+    const baseBtnPadding = 6;
+    btn.style.fontSize = (baseBtnFontSize * scale) + "px";
+    btn.style.padding = (baseBtnPadding * scale) + "px " + (baseBtnPadding * 1.3 * scale) + "px";
+  });
+  footer.style.padding = (basePadding * scale) + "px";
 }
 
 function addNote() {
@@ -494,14 +1045,27 @@ const noteObject = {
   category: "Uncategorized",
   top: "50px", left: "50px", width: "300px", height: "220px",
   color: "#fff59d", shape: "rectangle", reminderDate: null,
+  type: "note", // Default to regular note, can be "checklist"
   createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-};  notes.push(noteObject); saveNotes(notes); renderAllNotes(); updateSidebar();
+};  
+  notes.push(noteObject); 
+  saveNotes(notes);
+  // Save initial version (#75)
+  versionHistoryService.saveVersion(noteObject);
+  renderAllNotes(); 
+  updateSidebar();
 }
 
 function updateNote(id, newContent, element, newTitle = "Untitled", extras = {}) {
   const notes = getNotes();
   const target = notes.find(n => n.id == id);
   if (!target) return;
+
+  // Check if content actually changed before saving version
+  const contentChanged = target.content !== newContent || target.title !== newTitle;
+  const significantChange = contentChanged || 
+    (extras.color !== undefined && extras.color !== target.color) ||
+    (extras.shape !== undefined && extras.shape !== target.shape);
 
   target.content = newContent;
   target.title = newTitle; 
@@ -516,6 +1080,13 @@ function updateNote(id, newContent, element, newTitle = "Untitled", extras = {})
 
   target.updatedAt = new Date().toISOString();
   saveNotes(notes);
+  
+  // Save version history for significant changes (#75)
+  // Debounce: only save if content/title changed (not just position)
+  if (contentChanged) {
+    versionHistoryService.saveVersion(target);
+  }
+  
   updateSidebar();
 }
 
@@ -532,12 +1103,40 @@ function renderAllNotes(filterQuery="") {
 // init
 init();
 function init(){
+  // Check if this is a shared note view (#81)
+  if (sharingService.isSharedView()) {
+    const token = sharingService.getShareTokenFromURL();
+    const sharedNote = sharingService.getSharedNote(token);
+    
+    if (sharedNote) {
+      // Show shared note view
+      const sharedView = createSharedNoteView(sharedNote);
+      document.body.innerHTML = "";
+      document.body.appendChild(sharedView);
+      return; // Don't initialize normal app
+    } else {
+      alert("This shared note link is invalid or has been revoked.");
+    }
+  }
+
   addNoteButton = notesContainer.querySelector(".add-note");
   if(addNoteButton) addNoteButton.addEventListener("click", addNote);
   renderAllNotes();
   if("Notification" in window && Notification.permission!=="granted") notificationService.requestPermission();
   reminderScheduler.rescheduleAll(getNotes());
   searchInput.addEventListener("input",(e)=>renderAllNotes(e.target.value));
+  
+  // Initialize sync manager (#72, #74)
+  syncManagerService.init();
+  
+  // Save initial versions for existing notes (#75)
+  const notes = getNotes();
+  notes.forEach(note => {
+    const history = versionHistoryService.getHistory(note.id);
+    if (history.length === 0) {
+      versionHistoryService.saveVersion(note);
+    }
+  });
 }
 
 window._stickies = { getNotes, saveNotes, renderAllNotes, addNote };
