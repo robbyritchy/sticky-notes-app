@@ -757,6 +757,7 @@ function createNoteElement(id, content, savedData = {}) {
           if (note) {
             checklistService.toggleItem(note, item.id);
             saveNotes(notes);
+            updateProgress(); // Update progress immediately after toggling
             renderChecklistItems();
             updateNote(id, "", wrapper, titleInput.value, savedData);
           }
