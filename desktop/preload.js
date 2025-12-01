@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('desktop:check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('desktop:install-update'),
 
+  // Popout windows
+  createPopoutWindow: (options) => ipcRenderer.invoke('desktop:create-popout-window', options),
+
   // Menu events
   onMenuNewNote: (callback) => ipcRenderer.on('menu-new-note', callback),
   onMenuImport: (callback) => ipcRenderer.on('menu-import', callback),

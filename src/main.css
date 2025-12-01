@@ -257,10 +257,34 @@ body.popout-mode .note-wrapper {
   min-width: 180px;
   border-radius: 4px;
   margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .note-actions-dropdown-menu .dropdown-item:hover {
   background: #f5f5f5;
+}
+
+/* Note menu button */
+.note-menu-btn {
+  font-size: 16px !important;
+  line-height: 1;
+  padding: 2px 6px !important;
+  background: #f0e45c !important;
+  border: 1px solid #d6c700 !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #333 !important;
+  font-weight: bold !important;
+}
+
+.note-menu-btn:hover {
+  background: #e8dc54 !important;
 }
 
 /* Note content */

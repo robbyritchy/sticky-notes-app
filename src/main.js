@@ -13,45 +13,6 @@ import { createShareModal } from "./components/ShareModal.js";
 import { createSharedNoteView } from "./components/SharedNoteView.js";
 import { createAnalyticsView } from "./components/AnalyticsView.js";
 
-// ============================================================================
-// Feature Tasks - IMPLEMENTED
-// ============================================================================
-//
-// Local Storage for Offline Notes
-// #71 ✅ Implement local storage for offline notes (using localStorage)
-// #72 ✅ Develop sync manager service
-// #73 ⚠️ Update backend for version control (placeholder - ready for backend integration)
-// #74 ✅ Add sync status and error messages
-//
-// Activity Log / Version History (#63)
-// #75 ✅ Implement version tracking for notes
-// #76 ✅ Create "History" modal UI
-// #77 ✅ Add version preview before restore
-// #78 ✅ Implement restore functionality
-// #79 ✅ Persist version history data
-//
-// Collaboration (Share Notes) (#62)
-// #80 ✅ Generate shareable link for notes
-// #81 ✅ Create shared note read-only view
-// #82 ✅ Update shared note when owner edits
-// #83 ✅ Handle revoked link access
-// #84 ✅ Test sharing flow and permissions
-//
-// Checklist / To-Do Notes (#65)
-// #85 ✅ Add dynamic checklist item creation
-// #86 ✅ Implement check/uncheck functionality
-// #87 ✅ Apply visual updates for completed items
-// #88 ✅ Persist checklist state after reload
-// #89 ✅ Convert existing notes into checklists
-//
-// Pop-Out Note (Detached View)
-// #100 ✅ Add "Pop Out" button to note cards
-// #101 ✅ Implement pop-out note window (new browser window/tab)
-// #102 ✅ Enable auto-save and sync between views (via localStorage + storage events)
-// #103 ✅ Persist note data after closing pop-out (localStorage)
-// #104 ✅ Support multiple pop-out windows
-//
-// ============================================================================
 
 const notesContainer = document.getElementById("app");
 let addNoteButton = notesContainer.querySelector(".add-note");
@@ -473,14 +434,38 @@ function createNoteElement(id, content, savedData = {}) {
 
   // Dropdown button
   const menuBtn = document.createElement("button");
-  menuBtn.className = "small";
+  menuBtn.className = "note-menu-btn";
   menuBtn.textContent = "⋯";
   menuBtn.title = "Note options";
   menuBtn.style.cssText = `
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
-    padding: 4px 8px;
+    padding: 2px 6px;
+    background: #f0e45c;
+    border: 1px solid #d6c700;
+    border-radius: 3px;
+    cursor: pointer;
+    min-width: 20px;
+    min-height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-weight: bold;
+    position: relative;
+    z-index: 10;
   `;
+
+  // Add click visual feedback
+  menuBtn.addEventListener("mousedown", () => {
+    menuBtn.style.background = "#e8dc54";
+  });
+  menuBtn.addEventListener("mouseup", () => {
+    menuBtn.style.background = "#f0e45c";
+  });
+  menuBtn.addEventListener("mouseleave", () => {
+    menuBtn.style.background = "#f0e45c";
+  });
 
   // Dropdown menu
   const dropdown = document.createElement("div");
@@ -491,13 +476,16 @@ function createNoteElement(id, content, savedData = {}) {
     right: 0;
     background: white;
     border: 1px solid #ccc;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     padding: 4px 0;
     display: none;
-    z-index: 10000;
+    z-index: 1000000;
     min-width: 180px;
     border-radius: 4px;
     margin-top: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    pointer-events: auto;
   `;
 
   // Build dropdown items
@@ -652,7 +640,7 @@ function createNoteElement(id, content, savedData = {}) {
     dropdown.appendChild(createDivider());
 
     // Pop-out in new window (#100, #101, #104)
-    const popoutItem = createDropdownItem("🡥 Pop Out in New Window", () => {
+    const popoutItem = createDropdownItem("🡥 Pop Out in New Window", async () => {
       // Get the note element to calculate its size
       const noteElement = document.querySelector(`.note-wrapper[data-id="${id}"]`);
       if (!noteElement) {
@@ -666,11 +654,30 @@ function createNoteElement(id, content, savedData = {}) {
 
       const url = new URL(window.location.href);
       url.searchParams.set("popout", id);
-      window.open(
-        url.toString(),
-        "_blank",
-        `width=${noteWidth},height=${noteHeight},scrollbars=no,resizable=no`
-      );
+
+      // In Electron, use IPC to create a new window instead of window.open()
+      if (window.electronAPI) {
+        try {
+          // Send message to main process to create popout window
+          await window.electronAPI.createPopoutWindow({
+            url: url.toString(),
+            width: noteWidth,
+            height: noteHeight
+          });
+        } catch (error) {
+          console.error("Failed to create popout window:", error);
+          // Fallback to regular window.open for web
+          window.open(url.toString(), "_blank");
+        }
+      } else {
+        // Web fallback
+        window.open(
+          url.toString(),
+          "_blank",
+          `width=${noteWidth},height=${noteHeight},scrollbars=no,resizable=no`
+        );
+      }
+
       dropdown.style.display = "none";
     });
     dropdown.appendChild(popoutItem);
@@ -709,11 +716,50 @@ function createNoteElement(id, content, savedData = {}) {
 
   // Toggle dropdown
   menuBtn.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
+
     const isVisible = dropdown.style.display === "block";
-    dropdown.style.display = isVisible ? "none" : "block";
-    if (!isVisible) {
+
+    if (isVisible) {
+      dropdown.style.display = "none";
+    } else {
+      // Ensure dropdown is properly positioned before showing
+      dropdown.style.display = "block";
       buildDropdownMenu();
+
+      // Position dropdown to stay within window bounds
+      setTimeout(() => {
+        const buttonRect = menuBtn.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Use absolute positioning for better control
+        let dropdownLeft = buttonRect.right;
+        let dropdownTop = buttonRect.bottom + 4;
+
+        // Check if dropdown would go off right edge
+        const estimatedDropdownWidth = 200; // approximate
+        if (dropdownLeft + estimatedDropdownWidth > windowWidth) {
+          dropdownLeft = buttonRect.left - estimatedDropdownWidth;
+          if (dropdownLeft < 0) dropdownLeft = 10; // keep some margin
+        }
+
+        // Check if dropdown would go off bottom edge
+        const estimatedDropdownHeight = 200; // approximate
+        if (dropdownTop + estimatedDropdownHeight > windowHeight) {
+          dropdownTop = buttonRect.top - estimatedDropdownHeight - 4;
+          if (dropdownTop < 10) dropdownTop = 10; // keep some margin
+        }
+
+        // Apply fixed positioning
+        dropdown.style.position = 'fixed';
+        dropdown.style.left = dropdownLeft + 'px';
+        dropdown.style.top = dropdownTop + 'px';
+        dropdown.style.right = 'auto';
+        dropdown.style.bottom = 'auto';
+        dropdown.style.margin = '0';
+      }, 10);
     }
   });
 
@@ -723,6 +769,13 @@ function createNoteElement(id, content, savedData = {}) {
       dropdown.style.display = "none";
     }
   });
+
+  // In desktop app, ensure dropdown is properly positioned
+  if (window.electronAPI || window.isElectron) {
+    // Force dropdown to use fixed positioning in desktop app
+    dropdown.style.position = 'fixed';
+    dropdown.style.zIndex = '999999';
+  }
 
   dropdownWrapper.appendChild(menuBtn);
   dropdownWrapper.appendChild(dropdown);
@@ -1165,6 +1218,7 @@ function renderPopoutNote(noteId) {
 // init
 init();
 function init(){
+
   const urlParams = new URLSearchParams(window.location.search);
   const popoutId = urlParams.get("popout");
 
@@ -1181,7 +1235,7 @@ function init(){
   if (sharingService.isSharedView()) {
     const token = sharingService.getShareTokenFromURL();
     const sharedNote = sharingService.getSharedNote(token);
-    
+
     if (sharedNote) {
       // Show shared note view
       const sharedView = createSharedNoteView(sharedNote);
@@ -1200,10 +1254,10 @@ function init(){
   if("Notification" in window && Notification.permission!=="granted") notificationService.requestPermission();
   reminderScheduler.rescheduleAll(getNotes());
   searchInput.addEventListener("input",(e)=>renderAllNotes(e.target.value));
-  
+
   // Initialize sync manager (#72, #74)
   syncManagerService.init();
-  
+
   // Save initial versions for existing notes (#75)
   const notes = getNotes();
   notes.forEach(note => {
@@ -1212,6 +1266,7 @@ function init(){
       versionHistoryService.saveVersion(note);
     }
   });
+
 }
 
 // Cross-window sync: update views when notes change in another tab/window (#102, #104)

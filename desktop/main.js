@@ -24,9 +24,9 @@ function createWindow() {
     show: false // Don't show until ready
   });
 
-  // Load the app
-  const indexPath = path.join(__dirname, '..', 'index.html');
-  mainWindow.loadFile(indexPath);
+
+const indexPath = path.join(__dirname, '..', 'index.html');
+mainWindow.loadFile(indexPath);
 
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
@@ -199,6 +199,55 @@ ipcMain.handle('desktop:show-open-dialog', async (event, options) => {
 
 ipcMain.handle('desktop:show-message-box', async (event, options) => {
   return await dialog.showMessageBox(mainWindow, options);
+});
+
+ipcMain.handle('desktop:create-popout-window', async (event, options) => {
+  const { url, width, height } = options;
+
+  try {
+    // Create a new popout window
+    const popoutWindow = new BrowserWindow({
+      width: width,
+      height: height,
+      minWidth: 200,
+      minHeight: 150,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        enableRemoteModule: false,
+        preload: path.join(__dirname, 'preload.js')
+      },
+      titleBarStyle: 'default',
+      show: false, // Don't show until ready
+      parent: mainWindow, // Make it a child window of the main window
+      modal: false // Allow interaction with parent window
+    });
+
+    // Load the popout URL
+    popoutWindow.loadURL(url);
+
+    // Show window when ready
+    popoutWindow.once('ready-to-show', () => {
+      popoutWindow.show();
+    });
+
+    // Handle window closed
+    popoutWindow.on('closed', () => {
+      // Cleanup if needed
+    });
+
+    // Handle external links (prevent opening in system browser)
+    popoutWindow.webContents.setWindowOpenHandler(({ url: externalUrl }) => {
+      // For popout windows, allow opening external links in system browser
+      require('electron').shell.openExternal(externalUrl);
+      return { action: 'deny' };
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to create popout window:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Auto-updater setup (placeholder for #113)
