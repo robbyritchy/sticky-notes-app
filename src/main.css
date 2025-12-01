@@ -24,6 +24,41 @@ body {
   overflow: hidden;
 }
 
+body.popout-mode {
+  background: transparent;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+body.popout-mode .note-wrapper {
+  position: static !important;
+  margin: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Pop-out mode: hide app chrome, show only the note */
+.popout-mode #notes-sidebar {
+  display: none;
+}
+
+.popout-mode #app {
+  margin-left: 0;
+  width: 100%;
+}
+
+.popout-mode .toolbar,
+.popout-mode .search-bar,
+.popout-mode #theme-switch,
+.popout-mode .add-note {
+  display: none !important;
+}
+
 /* Sidebar */
 #notes-sidebar {
   position: absolute;
@@ -147,6 +182,22 @@ body {
   flex-direction: column;
   resize: both;
   transition: box-shadow .12s;
+}
+
+/* Pop-out note layout: center a single note, no dragging layout chrome */
+.popout-mode #app {
+  margin-left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popout-mode .note-wrapper {
+  position: static;
+  resize: none;
+  cursor: default;
 }
 
 /* Shape variations */

@@ -11,6 +11,7 @@ import { sharingService } from "./services/sharingService.js";
 import { checklistService } from "./services/checklistService.js";
 import { createShareModal } from "./components/ShareModal.js";
 import { createSharedNoteView } from "./components/SharedNoteView.js";
+import { createAnalyticsView } from "./components/AnalyticsView.js";
 
 // ============================================================================
 // Feature Tasks - IMPLEMENTED
@@ -42,6 +43,13 @@ import { createSharedNoteView } from "./components/SharedNoteView.js";
 // #87 ✅ Apply visual updates for completed items
 // #88 ✅ Persist checklist state after reload
 // #89 ✅ Convert existing notes into checklists
+//
+// Pop-Out Note (Detached View)
+// #100 ✅ Add "Pop Out" button to note cards
+// #101 ✅ Implement pop-out note window (new browser window/tab)
+// #102 ✅ Enable auto-save and sync between views (via localStorage + storage events)
+// #103 ✅ Persist note data after closing pop-out (localStorage)
+// #104 ✅ Support multiple pop-out windows
 //
 // ============================================================================
 
@@ -145,6 +153,14 @@ toolbar.appendChild(exportWrapper);
 
 const styleLegendBtn = document.createElement("button"); styleLegendBtn.textContent = "Style";
 
+// Analytics button
+const analyticsBtn = document.createElement("button");
+analyticsBtn.textContent = "📊 Analytics";
+analyticsBtn.title = "View analytics and insights";
+analyticsBtn.addEventListener("click", () => {
+  switchToAnalyticsView();
+});
+
 // Sync status indicator
 const syncStatusContainer = document.createElement("div");
 syncStatusContainer.className = "sync-status";
@@ -206,6 +222,7 @@ syncManagerService.onStatusChange(updateSyncStatus);
 
 toolbar.appendChild(importBtn);
 toolbar.appendChild(styleLegendBtn);
+toolbar.appendChild(analyticsBtn);
 toolbar.appendChild(syncStatusContainer);
 notesContainer.appendChild(toolbar);
 
@@ -630,6 +647,33 @@ function createNoteElement(id, content, savedData = {}) {
       }
     );
     dropdown.appendChild(checklistItem);
+
+    // Divider
+    dropdown.appendChild(createDivider());
+
+    // Pop-out in new window (#100, #101, #104)
+    const popoutItem = createDropdownItem("🡥 Pop Out in New Window", () => {
+      // Get the note element to calculate its size
+      const noteElement = document.querySelector(`.note-wrapper[data-id="${id}"]`);
+      if (!noteElement) {
+        dropdown.style.display = "none";
+        return;
+      }
+
+      const rect = noteElement.getBoundingClientRect();
+      const noteWidth = Math.max(200, Math.ceil(rect.width + 20)); // Add some padding, round up
+      const noteHeight = Math.max(150, Math.ceil(rect.height + 20)); // Add some padding, round up
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("popout", id);
+      window.open(
+        url.toString(),
+        "_blank",
+        `width=${noteWidth},height=${noteHeight},scrollbars=no,resizable=no`
+      );
+      dropdown.style.display = "none";
+    });
+    dropdown.appendChild(popoutItem);
   }
 
   function createDropdownItem(text, onClick) {
@@ -1101,10 +1145,39 @@ function renderAllNotes(filterQuery="") {
   updateSidebar();
 }
 
+// Render a single note (used for pop-out windows)
+function renderPopoutNote(noteId) {
+  // Clear everything from body
+  document.body.innerHTML = "";
+
+  const notes = getNotes();
+  const note = notes.find(n => n.id === noteId);
+
+  if (!note) {
+    document.body.innerHTML = "<p style='padding:16px;color:#666'>Note not found.</p>";
+    return;
+  }
+
+  const el = createNoteElement(note.id, note.content, note);
+  document.body.appendChild(el);
+}
+
 // init
 init();
 function init(){
-  // Check if this is a shared note view (#81)
+  const urlParams = new URLSearchParams(window.location.search);
+  const popoutId = urlParams.get("popout");
+
+  // Pop-out note view (#101)
+  if (popoutId) {
+    document.body.classList.add("popout-mode");
+    renderPopoutNote(popoutId);
+    reminderScheduler.rescheduleAll(getNotes());
+    syncManagerService.init();
+    return;
+  }
+
+  // Shared note view (#81)
   if (sharingService.isSharedView()) {
     const token = sharingService.getShareTokenFromURL();
     const sharedNote = sharingService.getSharedNote(token);
@@ -1120,6 +1193,7 @@ function init(){
     }
   }
 
+  // Main app view
   addNoteButton = notesContainer.querySelector(".add-note");
   if(addNoteButton) addNoteButton.addEventListener("click", addNote);
   renderAllNotes();
@@ -1138,6 +1212,67 @@ function init(){
       versionHistoryService.saveVersion(note);
     }
   });
+}
+
+// Cross-window sync: update views when notes change in another tab/window (#102, #104)
+window.addEventListener("storage", (e) => {
+  if (e.key !== "stickynotes-notes") return;
+
+  const params = new URLSearchParams(window.location.search);
+  const popoutId = params.get("popout");
+
+  if (popoutId) {
+    // Pop-out window: re-render that specific note
+    renderPopoutNote(popoutId);
+    reminderScheduler.rescheduleAll(getNotes());
+  } else if (!sharingService.isSharedView()) {
+    // Main app view: re-render all notes (ignore shared read-only view)
+    const currentQuery = (typeof searchInput !== "undefined" && searchInput.value) || "";
+    renderAllNotes(currentQuery);
+    reminderScheduler.rescheduleAll(getNotes());
+  }
+});
+
+// View switching functions (#105)
+let currentView = "notes"; // "notes" or "analytics"
+let analyticsViewElement = null;
+
+function switchToAnalyticsView() {
+  if (currentView === "analytics") return;
+
+  // Hide notes view elements
+  sidebar.style.display = "none";
+  toolbar.style.display = "none";
+  searchBar.style.display = "none";
+  notesContainer.style.display = "none";
+
+  // Show analytics view
+  analyticsViewElement = createAnalyticsView(switchToNotesView);
+  document.body.appendChild(analyticsViewElement);
+
+  currentView = "analytics";
+}
+
+function switchToNotesView() {
+  if (currentView === "notes") return;
+
+  // Remove analytics view
+  if (analyticsViewElement) {
+    document.body.removeChild(analyticsViewElement);
+    analyticsViewElement = null;
+  }
+
+  // Show notes view elements
+  sidebar.style.display = "";
+  toolbar.style.display = "";
+  searchBar.style.display = "";
+  notesContainer.style.display = "";
+
+  // Refresh notes view
+  const currentQuery = (typeof searchInput !== "undefined" && searchInput.value) || "";
+  renderAllNotes(currentQuery);
+
+  currentView = "notes";
 }
 
 window._stickies = { getNotes, saveNotes, renderAllNotes, addNote };
