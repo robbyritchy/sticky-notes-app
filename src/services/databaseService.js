@@ -345,12 +345,22 @@ class DatabaseService {
 // Create and export a singleton instance
 export const databaseService = new DatabaseService();
 
-// Auto-initialize and migrate on first use (non-blocking)
+// Auto-initialize and seed with sample data on first use (non-blocking)
 setTimeout(async () => {
   try {
     await databaseService.init();
     console.log('Database initialized successfully');
 
+    // Check if already seeded
+    const seeded = await databaseService.getSetting('seeded').catch(() => null);
+    if (!seeded) {
+      console.log('Seeding database with sample data...');
+      await seedDatabase();
+      await databaseService.saveSetting('seeded', true);
+      console.log('Database seeded successfully');
+    }
+
+    // Check for localStorage migration
     const migrationCompleted = await databaseService.getSetting('migrationCompleted').catch(() => null);
     if (!migrationCompleted) {
       console.log('Starting localStorage migration...');
@@ -363,3 +373,77 @@ setTimeout(async () => {
     databaseService.fallbackToLocalStorage = true;
   }
 }, 0);
+
+// Sample data seeding function
+async function seedDatabase() {
+  const sampleCategories = [
+    { id: 'work', name: 'Work' },
+    { id: 'personal', name: 'Personal' },
+    { id: 'ideas', name: 'Ideas' }
+  ];
+
+  const sampleNotes = [
+    {
+      id: 'welcome-note',
+      title: 'Welcome to Sticky Notes!',
+      content: `🎉 Welcome to your new sticky notes app with permanent storage!
+
+This note demonstrates the database persistence feature. Your notes now save automatically and will persist across browser sessions.
+
+Features:
+• Permanent storage (no more lost notes!)
+• Unlimited version history
+• Categories and organization
+• Cross-device sync ready
+
+Try creating a new note and refreshing the page - it will still be here!`,
+      category: 'personal',
+      color: '#e8f5e8',
+      shape: 'rectangle',
+      top: 100,
+      left: 100,
+      width: 320,
+      height: 200,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'getting-started',
+      title: 'Getting Started',
+      content: `📝 Quick start guide:
+
+1. Click the + button to create new notes
+2. Drag notes around to organize your workspace
+3. Click the ⋯ menu on any note for options
+4. Use categories to organize your notes
+5. Double-click notes to edit them
+
+All your notes are automatically saved and will be here when you return!`,
+      category: 'ideas',
+      color: '#e3f2fd',
+      shape: 'rectangle',
+      top: 350,
+      left: 150,
+      width: 300,
+      height: 180,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  try {
+    // Add categories
+    for (const category of sampleCategories) {
+      await databaseService.saveCategory(category);
+    }
+
+    // Add notes
+    for (const note of sampleNotes) {
+      await databaseService.saveNote(note);
+    }
+
+    console.log(`Seeded ${sampleNotes.length} notes and ${sampleCategories.length} categories`);
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  }
+}

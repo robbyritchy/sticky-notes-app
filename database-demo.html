@@ -60,7 +60,6 @@
         <h2>Database Status</h2>
         <div id="db-status" class="status">Initializing...</div>
         <button onclick="initDatabase()">Initialize Database</button>
-        <button onclick="seedDatabase()">🌱 Seed Sample Data</button>
         <button onclick="showStats()">Show Database Stats</button>
         <button onclick="clearDatabase()">Clear All Data</button>
     </div>
@@ -93,7 +92,6 @@
         import { databaseService } from './src/services/databaseService.js';
         import { analyticsService } from './src/services/analyticsService.js';
         import { versionHistoryService } from './src/services/versionHistoryService.js';
-        import { seeder } from './seed.js';
 
         window.databaseService = databaseService;
         window.analyticsService = analyticsService;
@@ -139,6 +137,7 @@
                 alert(`Error getting stats: ${error.message}`);
             }
         };
+
 
         // Clear database
         window.clearDatabase = async function() {

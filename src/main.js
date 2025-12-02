@@ -1215,7 +1215,85 @@ function renderPopoutNote(noteId) {
   document.body.appendChild(el);
 }
 
+// Initialize with sample notes on first load
+function initializeSampleData() {
+  const notesKey = "stickynotes-notes";
+  const categoriesKey = "stickynotes-categories";
+
+  // Check if data already exists
+  const existingNotes = localStorage.getItem(notesKey);
+  if (existingNotes && JSON.parse(existingNotes).length > 0) {
+    return; // Don't overwrite existing data
+  }
+
+  // Sample categories
+  const sampleCategories = [
+    { id: 'work', name: 'Work' },
+    { id: 'personal', name: 'Personal' },
+    { id: 'ideas', name: 'Ideas' }
+  ];
+
+  // Sample notes
+  const sampleNotes = [
+    {
+      id: 'welcome-note',
+      title: 'Welcome to Sticky Notes!',
+      content: `🎉 Welcome to your sticky notes app!
+
+This note demonstrates the app's features. Your notes are automatically saved and will persist when you refresh the page.
+
+Features:
+• Drag notes around to organize your workspace
+• Click the ⋯ menu for note options
+• Use categories to organize your notes
+• Double-click notes to edit them
+• Notes persist across browser sessions
+
+Try creating a new note with the + button!`,
+      category: 'personal',
+      color: '#e8f5e8',
+      shape: 'rectangle',
+      top: 100,
+      left: 100,
+      width: 320,
+      height: 200,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'getting-started',
+      title: 'Getting Started Guide',
+      content: `📝 How to use Sticky Notes:
+
+1. **Create notes**: Click the + button in the top-left
+2. **Edit notes**: Double-click any note to edit its content
+3. **Move notes**: Drag notes around by their title bar
+4. **Organize**: Use categories to group related notes
+5. **Options**: Click ⋯ on any note for more options
+6. **Persistence**: Your notes save automatically!
+
+The app remembers everything - try refreshing the page!`,
+      category: 'ideas',
+      color: '#e3f2fd',
+      shape: 'rectangle',
+      top: 350,
+      left: 150,
+      width: 300,
+      height: 180,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+
+  // Save sample data
+  localStorage.setItem(notesKey, JSON.stringify(sampleNotes));
+  localStorage.setItem(categoriesKey, JSON.stringify(sampleCategories));
+
+  console.log('Sample notes loaded for first-time users!');
+}
+
 // init
+initializeSampleData();
 init();
 function init(){
 
