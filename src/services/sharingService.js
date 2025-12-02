@@ -5,6 +5,8 @@
 // #83 Handle revoked link access
 // #84 Test sharing flow and permissions
 
+// import { databaseAdapter } from "./databaseAdapter.js";
+
 export const sharingService = {
   // Generate a unique shareable link for a note
   generateShareLink(noteId) {
@@ -20,7 +22,7 @@ export const sharingService = {
     // Store share data
     const key = `stickynotes-share-${token}`;
     localStorage.setItem(key, JSON.stringify(shareData));
-    
+
     // Also store token in note's share info
     const notes = JSON.parse(localStorage.getItem("stickynotes-notes") || "[]");
     const note = notes.find(n => n.id === noteId);
@@ -39,11 +41,11 @@ export const sharingService = {
   getSharedNote(token) {
     const key = `stickynotes-share-${token}`;
     const shareData = JSON.parse(localStorage.getItem(key) || "null");
-    
+
     if (!shareData || !shareData.isActive) {
       return null;
     }
-    
+
     const notes = JSON.parse(localStorage.getItem("stickynotes-notes") || "[]");
     const note = notes.find(n => n.id === shareData.noteId);
     
@@ -63,11 +65,11 @@ export const sharingService = {
   revokeShareLink(token) {
     const key = `stickynotes-share-${token}`;
     const shareData = JSON.parse(localStorage.getItem(key) || "null");
-    
+
     if (shareData) {
       shareData.isActive = false;
       localStorage.setItem(key, JSON.stringify(shareData));
-      
+
       // Remove token from note
       const notes = JSON.parse(localStorage.getItem("stickynotes-notes") || "[]");
       const note = notes.find(n => n.shareToken === token);
@@ -76,7 +78,7 @@ export const sharingService = {
         note.isShared = false;
         localStorage.setItem("stickynotes-notes", JSON.stringify(notes));
       }
-      
+
       return true;
     }
     return false;

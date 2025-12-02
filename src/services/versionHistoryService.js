@@ -10,7 +10,7 @@ export const versionHistoryService = {
   },
 
   // Save a version snapshot
-  saveVersion(note) {
+  async saveVersion(note) {
     if (!note || !note.id) return;
     
     const key = `stickynotes-history-${note.id}`;

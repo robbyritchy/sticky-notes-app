@@ -5,6 +5,8 @@
 // #108 Integrate reminders and pinned note data
 // #109 Sync analytics across devices
 
+// import { databaseAdapter } from "./databaseAdapter.js";
+
 export const analyticsService = {
   // Calculate comprehensive analytics data
   getAnalytics() {

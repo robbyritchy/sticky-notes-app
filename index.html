@@ -23,6 +23,9 @@
   
   <div id="app">
     <button class="add-note" type="button">+</button>
+    <button id="database-switch" title="Enable Permanent Storage">
+      <span class="material-symbols-outlined">database</span>
+    </button>
     <button id="theme-switch">
       <span class="material-symbols-outlined">dark_mode</span>
       <span class="material-symbols-outlined">light_mode</span>
@@ -30,5 +33,9 @@
   </div>
 
   <script type="module" src="src/main.js"></script>
+
+  <!-- Optional: Enable database persistence for permanent note storage -->
+  <!-- Uncomment the line below to enable IndexedDB for permanent storage -->
+  <!-- <script type="module" src="src/database-integration.js"></script> -->
 </body>
 </html>

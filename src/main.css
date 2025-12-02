@@ -240,6 +240,34 @@ body.popout-mode .note-wrapper {
   align-items:center;
 }
 
+/* Database switch button */
+#database-switch {
+  position: fixed;
+  top: 10px;
+  right: 120px;
+  background: #6c757d;
+  border: 1px solid #5a6268;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  font-size: 18px;
+  transition: background 0.2s;
+}
+
+#database-switch:hover {
+  background: #5a6268;
+}
+
+#database-switch[title*="Enabled"] {
+  background: #28a745 !important;
+  border-color: #1e7e34;
+}
+
 /* Note actions dropdown */
 .note-actions-dropdown {
   position: relative;
